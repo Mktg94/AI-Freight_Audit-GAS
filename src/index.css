@@ -1,0 +1,231 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+@import "tailwindcss";
+
+:root, [data-theme="navy"] {
+  --bg-primary: #080E1E;
+  --bg-surface: #0E1629;
+  --bg-elevated: #18233C;
+  --border-color: #1F3050;
+  --accent-color: #0D9488; /* Sophisticated Logistics Cargo Teal */
+  --accent-hover: #0F766E;
+  --accent-text: #FFFFFF;
+  --warning-color: #F59E0B;
+  --danger-color: #EF4444;
+  --success-color: #10B981;
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  --text-muted: #5E718D;
+}
+
+[data-theme="high-contrast"] {
+  --bg-primary: #030712;
+  --bg-surface: #0F172A;
+  --bg-elevated: #1E293B;
+  --border-color: #475569;
+  --accent-color: #0EA5E9; /* Accessible Ocean Sky */
+  --accent-hover: #0284C7;
+  --accent-text: #FFFFFF;
+  --warning-color: #F59E0B;
+  --danger-color: #EF4444;
+  --success-color: #10B981;
+  --text-primary: #FFFFFF;
+  --text-secondary: #CBD5E1;
+  --text-muted: #64748B;
+}
+
+[data-theme="light-mode"] {
+  --bg-primary: #F8FAFC;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #F1F5F9;
+  --border-color: #D1D5DB; /* Higher contrast borders */
+  --accent-color: #0F766E; /* Industrial High-Contrast Sea Teal */
+  --accent-hover: #115E59;
+  --accent-text: #FFFFFF;
+  --warning-color: #D97706;
+  --danger-color: #DC2626;
+  --success-color: #16A34A;
+  --text-primary: #0F172A; /* Slate 900 for absolute readability */
+  --text-secondary: #334155; /* Slate 700 for high readability secondary content */
+  --text-muted: #64748B; /* Slate 500 for legible description details */
+}
+
+[data-theme="emerald-obsidian"] {
+  --bg-primary: #021C16;
+  --bg-surface: #042E24;
+  --bg-elevated: #064537;
+  --border-color: #0F5A47;
+  --accent-color: #10B981;
+  --accent-hover: #059669;
+  --accent-text: #FFFFFF;
+  --warning-color: #FBBF24;
+  --danger-color: #EF4444;
+  --success-color: #10B981;
+  --text-primary: #ECFDF5;
+  --text-secondary: #86EFAC;
+  --text-muted: #0D503F;
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", sans-serif;
+  
+  --color-[#0a0f1e]: var(--bg-primary);
+  --color-[#111827]: var(--bg-surface);
+  --color-[#1c2537]: var(--bg-elevated);
+  --color-[#1f2d45]: var(--border-color);
+  --color-[#2dd4bf]: var(--accent-color);
+  --color-[#14b8a4]: var(--accent-hover);
+  --color-[#f59e0b]: var(--warning-color);
+  --color-[#ef4444]: var(--danger-color);
+  --color-[#10b981]: var(--success-color);
+  --color-[#f1f5f9]: var(--text-primary);
+  --color-[#94a3b8]: var(--text-secondary);
+  --color-[#475569]: var(--text-muted);
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: "Inter", sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: "Plus Jakarta Sans", sans-serif;
+}
+
+/* ==========================================================
+   GLOBAL STYLE OVERRIDES (TRANSFORMING FOREX GLOW INTO FLAT LOGISTICS CORPORATE DESIGN)
+   ========================================================== */
+
+/* 1. Neutralize aggressive neon forex glowing shadows into soft elegant shadows */
+[class*="shadow-[0_0_20px_rgba(45,212,191"],
+[class*="shadow-[0_0_15px_rgba(45,212,191"],
+[class*="shadow-[0_0_12px_rgba(45,212,191"],
+[class*="shadow-[0_0_10px_rgba(45,212,191"],
+[class*="shadow-[0_0_25px_rgba(45,212,191"],
+[class*="shadow-[0_0_30px_rgba(45,212,191"],
+[class*="drop-shadow-[0_0_"] {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* 2. Map arbitrary hardcoded color border flags to custom theme-aware border variables */
+.border-teal-900\/40, 
+[class*="border-teal-900/40"] {
+  border-color: var(--border-color) !important;
+}
+
+/* 3. Re-route hardcoded neon cyan to theme's accent color */
+.text-\[\#2DD4BF\], 
+.text-\[\#2dd4bf\],
+[class*="text-[#2DD4BF]"],
+[class*="text-[#2dd4bf]"] {
+  color: var(--accent-color) !important;
+}
+
+.bg-\[\#2DD4BF\], 
+.bg-\[\#2dd4bf\],
+[class*="bg-[#2DD4BF]"],
+[class*="bg-[#2dd4bf]"] {
+  background-color: var(--accent-color) !important;
+  color: var(--accent-text) !important;
+}
+
+.hover\:bg-\[\#14B8A4\]:hover, 
+.hover\:bg-\[\#14b8a4\]:hover,
+[class*="hover:bg-[#14B8A4]"]:hover,
+[class*="hover:bg-[#14b8a4]"]:hover {
+  background-color: var(--accent-hover) !important;
+}
+
+/* Ensure secondary / state color elements have safe backgrounds */
+.bg-teal-950\/30, 
+.bg-teal-950\/50,
+.bg-teal-950\/20,
+.bg-teal-950\/25,
+[class*="bg-teal-950/"] {
+  background-color: var(--bg-primary) !important;
+}
+
+/* 4. Support theme surfaces for high brightness or evergreen layouts */
+.bg-\[\#111827\], 
+[class*="bg-[#111827]"] {
+  background-color: var(--bg-surface) !important;
+}
+
+.bg-\[\#1C2537\], 
+[class*="bg-[#1C2537]"] {
+  background-color: var(--bg-elevated) !important;
+}
+
+.bg-\[\#0A0F1E\], 
+[class*="bg-[#0A0F1E]"] {
+  background-color: var(--bg-primary) !important;
+}
+
+/* 5. Custom typography refinements to feel highly technical and safe */
+button, input, select, textarea {
+  font-family: "Inter", sans-serif;
+}
+
+/* ==========================================================
+   6. ACCESSIBILITY CONTRAST OVERRIDES FOR LIGHT THEME
+   ========================================================== */
+[data-theme="light-mode"] .text-slate-400,
+[data-theme="light-mode"] .text-zinc-400,
+[data-theme="light-mode"] .text-gray-400,
+[data-theme="light-mode"] .text-neutral-400,
+[data-theme="light-mode"] [class*="text-slate-400"],
+[data-theme="light-mode"] [class*="text-zinc-400"],
+[data-theme="light-mode"] [class*="text-[#94A3B8]"],
+[data-theme="light-mode"] [class*="text-[#94a3b8]"] {
+  color: #334155 !important; /* Extremely readable medium dark grey on white background */
+}
+
+[data-theme="light-mode"] .text-slate-500,
+[data-theme="light-mode"] .text-zinc-500,
+[data-theme="light-mode"] .text-gray-500,
+[data-theme="light-mode"] .text-neutral-500,
+[data-theme="light-mode"] .text-slate-600,
+[data-theme="light-mode"] .text-zinc-600,
+[data-theme="light-mode"] .text-gray-600,
+[data-theme="light-mode"] [class*="text-slate-500"],
+[data-theme="light-mode"] [class*="text-zinc-500"],
+[data-theme="light-mode"] [class*="text-gray-500"] {
+  color: #1E293B !important; /* Very crisp Slate 800 */
+}
+
+[data-theme="light-mode"] .text-slate-300,
+[data-theme="light-mode"] .text-zinc-300,
+[data-theme="light-mode"] .text-gray-300,
+[data-theme="light-mode"] [class*="text-slate-300"],
+[data-theme="light-mode"] [class*="text-zinc-300"] {
+  color: #475569 !important; /* Readable Slate 600 */
+}
+
+[data-theme="light-mode"] .text-white,
+[data-theme="light-mode"] [class*="text-white"] {
+  /* In selective elements, if they are child of active states or dark elements, respect them, but otherwise map text-white directly to text-primary */
+  color: var(--text-primary);
+}
+
+/* Overriding individual components containing buttons that need pure white text labels inside light mode */
+[data-theme="light-mode"] button.bg-\[\#2dd4bf\],
+[data-theme="light-mode"] button.bg-\[\#2DD4BF\],
+[data-theme="light-mode"] .bg-\[\#2dd4bf\] button,
+[data-theme="light-mode"] [class*="bg-[var(--accent-color)]"] span,
+[data-theme="light-mode"] [class*="bg-[var(--accent-color)]"] p,
+[data-theme="light-mode"] button[class*="bg-accent-color"],
+[data-theme="light-mode"] button[class*="bg-[#2dd4bf]"],
+[data-theme="light-mode"] button[class*="bg-[#2DD4BF]"],
+[data-theme="light-mode"] a[class*="bg-accent-color"],
+[data-theme="light-mode"] a[class*="bg-[#2dd4bf]"] {
+  color: #FFFFFF !important;
+}
+
+[data-theme="light-mode"] .text-\[\#2dd4bf\],
+[data-theme="light-mode"] .text-\[\#2DD4BF\],
+[data-theme="light-mode"] [class*="text-[#2dd4bf]"],
+[data-theme="light-mode"] [class*="text-[#2DD4BF]"] {
+  color: var(--accent-color) !important;
+}
+
