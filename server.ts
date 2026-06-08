@@ -6,9 +6,7 @@ import { initialContracts, initialInvoices, initialLineItems, initialAuditLogs }
 import { extractInvoiceData } from "./lib/ai/extractInvoice";
 import { auditLineItems } from "./lib/ai/auditInvoice";
 import multer from "multer";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
+import { PDFParse } from "pdf-parse";
 
 const uploadRouter = multer({ storage: multer.memoryStorage() });
 
@@ -96,11 +94,12 @@ async function startServer() {
         return res.status(400).json({ error: "Missing contract id for reference comparison" });
       }
 
-      // Extract text using pdfParse
+      // Extract text using pdf-parse
       let pdfText = "";
       try {
-        const parsed = await pdfParse(file.buffer);
-        pdfText = parsed.text || "";
+        const parser = new PDFParse({ data: file.buffer });
+        const result = await parser.getText();
+        pdfText = result.text || "";
       } catch (pdfErr: any) {
         console.warn("Express pdf-parse extraction fallback active:", pdfErr.message);
         pdfText = `Invoice: mock. Weight: 2500 lbs. Dist: 540 miles. Cost: 1100. FedEx LTL.`;
