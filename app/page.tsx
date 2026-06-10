@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+const navigate = (href: string) => (e: React.MouseEvent) => { e.preventDefault(); window.history.pushState({}, '', href); window.dispatchEvent(new Event('popstate')) }
 import {
   ArrowRight,
   Upload,
@@ -14,9 +14,7 @@ import {
   Menu,
 } from "lucide-react"
 
-const Link = ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => (
-  <a href={href} className={className} onClick={(e) => { e.preventDefault(); window.history.pushState({}, '', href); window.dispatchEvent(new Event('popstate')); }}>{children}</a>
-)
+
 
 export default function LandingPage() {
   return (
@@ -25,7 +23,7 @@ export default function LandingPage() {
       <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           {/* LEFT — Logo */}
-          <Link href="/" className="flex items-center gap-2">
+          <a href="/" className="flex items-center gap-2" onClick={navigate('/')}>
             <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
               <span className="font-bold text-sm text-white">F</span>
             </div>
@@ -33,7 +31,7 @@ export default function LandingPage() {
               FreightAudit
               <span className="text-indigo-600 font-semibold">AI</span>
             </span>
-          </Link>
+          </a>
 
           {/* CENTER — Nav links (hidden on mobile: hidden md:flex gap-8): */}
           <div className="hidden md:flex gap-8">
@@ -44,32 +42,28 @@ export default function LandingPage() {
               Features
             </a>
             <a
-              href="#how"
-              className="text-sm text-gray-500 hover:text-gray-900 font-medium transition-colors duration-150"
-            >
-              How it works
-            </a>
-            <Link
               href="/pricing"
               className="text-sm text-gray-500 hover:text-gray-900 font-medium transition-colors duration-150"
+              onClick={navigate('/pricing')}
             >
               Pricing
-            </Link>
+            </a>
           </div>
 
           {/* RIGHT — CTA buttons (flex items-center gap-3) */}
           <div className="flex items-center gap-3">
-            <Link href="/auth/login" className="text-sm font-medium text-gray-600 hover:text-gray-900">
+            <a href="/auth/login" className="text-sm font-medium text-gray-600 hover:text-gray-900" onClick={navigate('/auth/login')}>
               Sign in
-            </Link>
+            </a>
 
-            <Link
+            <a
               href="/auth/signup"
               className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-150 inline-flex items-center gap-1.5"
+              onClick={navigate('/auth/signup')}
             >
               Get started free
               <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+            </a>
 
             {/* Mobile menu icon */}
             <button
@@ -113,21 +107,23 @@ export default function LandingPage() {
               </p>
 
               <div className="mt-7 flex flex-col sm:flex-row gap-3 sm:items-center">
-                <Link
+                <a
                   href="/auth/signup"
                   className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-3 rounded-xl inline-flex items-center justify-center gap-2 transition-colors duration-150"
+                  onClick={navigate('/auth/signup')}
                 >
                   Start Free Audit
                   <ArrowRight className="w-4 h-4" />
-                </Link>
-
-                <a
-                  href="#how"
-                  className="border border-indigo-200 hover:border-indigo-300 text-indigo-700 font-semibold text-sm px-4 py-3 rounded-xl inline-flex items-center gap-2 transition-colors duration-150 bg-white hover:bg-indigo-50/30"
-                >
-                  See How It Works
-                  <ChevronRight className="w-4 h-4" />
                 </a>
+
+            <a
+              href="/auth/signup"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-150 inline-flex items-center gap-1.5"
+              onClick={navigate('/auth/signup')}
+            >
+              Get started free
+              <ArrowRight className="w-3.5 h-3.5" />
+            </a>
               </div>
 
               <div className="mt-7 grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -396,13 +392,14 @@ export default function LandingPage() {
             </p>
 
             <div className="mt-8 flex items-center justify-center">
-              <Link
+              <a
                 href="/auth/signup"
                 className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-10 py-4 rounded-xl transition-colors duration-150 inline-flex items-center gap-2"
+                onClick={navigate('/auth/signup')}
               >
                 Get started free
                 <ArrowRight className="w-4 h-4" />
-              </Link>
+              </a>
             </div>
           </div>
         </div>
