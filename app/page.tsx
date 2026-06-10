@@ -1,434 +1,433 @@
-"use client";
+import { useCallback } from "react"
+import {
+  ArrowRight,
+  Upload,
+  Zap,
+  CheckCircle,
+  AlertTriangle,
+  BarChart3,
+  FileText,
+  Shield,
+  Clock,
+  TrendingUp,
+  ChevronRight,
+  Menu,
+} from "lucide-react"
 
-import React from 'react';
-import { 
-  Zap, ArrowRight, ShieldAlert, CheckCircle, UploadCloud, Cpu, 
-  HelpCircle, Sparkles, MoveRight, Layers, FileCheck, ShieldCheck, 
-  CheckCircle2, Laptop, Calendar, DollarSign, BarChart3, TrendingUp, Search
-} from 'lucide-react';
+const Link = ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) => (
+  <a href={href} className={className} onClick={(e) => { e.preventDefault(); window.history.pushState({}, '', href); window.dispatchEvent(new Event('popstate')); }}>{children}</a>
+)
 
 export default function LandingPage() {
-  const navigateTo = (path: string) => {
-    if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', path);
-      window.dispatchEvent(new Event('popstate'));
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-[#0A0F1E] text-[#F1F5F9] font-sans antialiased selection:bg-[#2DD4BF]/30 selection:text-[#2DD4BF]" id="landing-page-wrapper">
-      
-      {/* Dynamic drifting background dots styling */}
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes driftDots {
-          0% { background-position: 0px 0px; }
-          100% { background-position: 40px 40px; }
-        }
-        .drifting-dots-bg {
-          background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-          background-size: 24px 24px;
-          animation: driftDots 20s linear infinite;
-        }
-      `}} />
-
-      {/* SECTION 1 — Navigation */}
-      <nav className="bg-[#0A0F1E]/80 backdrop-blur-md sticky top-0 z-50 border-b border-[#1F2D45] transition-all duration-300" id="landing-navigation">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
-          
-          {/* Logo with small zap icon */}
-          <div 
-            onClick={() => navigateTo('/')}
-            className="flex items-center gap-2 cursor-pointer group"
-            id="nav-logo"
-          >
-            <div className="bg-[#2DD4BF]/10 text-[#2DD4BF] p-1.5 rounded-lg border border-[#2DD4BF]/20 shadow-[0_0_15px_rgba(45,212,191,0.15)] group-hover:scale-110 transition-transform">
-              <Zap size={18} className="fill-[#2DD4BF]/20 text-[#2DD4BF]" />
+    <div className={`font-sans bg-white min-h-screen`}>
+      {/* ── NAVBAR ── */}
+      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
+        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+          {/* LEFT — Logo */}
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
+              <span className="font-bold text-sm text-white">F</span>
             </div>
-            <span className="font-display font-black text-white hover:text-[#2DD4BF] tracking-tight uppercase text-lg transition-colors">
-              FreightAudit <span className="text-[#2DD4BF]">AI</span>
+            <span className="font-semibold text-gray-900 text-base">
+              FreightAudit
+              <span className="text-indigo-600 font-semibold">AI</span>
             </span>
-          </div>
+          </Link>
 
-          {/* Right Action Trigger Buttons */}
-          <div className="flex items-center gap-4" id="nav-actions">
-            <button
-              onClick={() => navigateTo('/pricing')}
-              className="text-xs uppercase font-extrabold tracking-wider text-slate-400 hover:text-[#2DD4BF] font-mono mr-2 transition-colors cursor-pointer"
-              id="nav-pricing-link"
+          {/* CENTER — Nav links (hidden on mobile: hidden md:flex gap-8): */}
+          <div className="hidden md:flex gap-8">
+            <a
+              href="#features"
+              className="text-sm text-gray-500 hover:text-gray-900 font-medium transition-colors duration-150"
+            >
+              Features
+            </a>
+            <a
+              href="#how"
+              className="text-sm text-gray-500 hover:text-gray-900 font-medium transition-colors duration-150"
+            >
+              How it works
+            </a>
+            <Link
+              href="/pricing"
+              className="text-sm text-gray-500 hover:text-gray-900 font-medium transition-colors duration-150"
             >
               Pricing
-            </button>
-            <button
-              onClick={() => navigateTo('/auth/login')}
-              className="font-mono text-xs uppercase font-extrabold tracking-wider border border-[#1F2D45] hover:border-[#2DD4BF] hover:text-[#2DD4BF] text-zinc-300 py-2 px-4.5 rounded-lg transition-all cursor-pointer"
-              id="nav-login-btn"
-            >
-              Login
-            </button>
-            <button
-              onClick={() => navigateTo('/auth/signup')}
-              className="bg-[#2DD4BF] hover:bg-[#14B8A4] text-black font-mono text-xs uppercase font-black tracking-wider py-2 px-5 rounded-lg transition-all cursor-pointer shadow-[0_0_20px_rgba(45,212,191,0.3)]"
-              id="nav-get-started-btn"
-            >
-              Get Started Free
-            </button>
+            </Link>
           </div>
 
+          {/* RIGHT — CTA buttons (flex items-center gap-3) */}
+          <div className="flex items-center gap-3">
+            <Link href="/auth/login" className="text-sm font-medium text-gray-600 hover:text-gray-900">
+              Sign in
+            </Link>
+
+            <Link
+              href="/auth/signup"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-150 inline-flex items-center gap-1.5"
+            >
+              Get started free
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+
+            {/* Mobile menu icon */}
+            <button
+              type="button"
+              className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50"
+              aria-label="Open menu"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      </nav>
+      </div>
 
-      {/* SECTION 2 — Hero */}
-      <header className="relative py-12 lg:py-24 bg-[#0A0F1E] drifting-dots-bg overflow-hidden flex flex-col justify-center border-b border-[#1F2D45]/30" id="landing-hero">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          
-          {/* Left Text content info */}
-          <div className="lg:col-span-7 space-y-6 text-left">
-            
-            {/* Beta pill */}
-            <div className="inline-flex items-center gap-2 bg-[#F59E0B]/10 border border-[#F59E0B]/30 text-[#F59E0B] rounded-full py-1 px-3.5 select-none font-mono text-[10px] uppercase font-black tracking-wider" id="hero-beta-badge">
-              <Sparkles size={11} className="fill-[#F59E0B]/15" />
-              <span>Now in Beta · Free to start</span>
-            </div>
+      {/* ── HERO ── */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute -top-24 -left-24 w-72 h-72 bg-indigo-50 rounded-full blur-3xl opacity-70" />
+          <div className="absolute top-24 -right-28 w-80 h-80 bg-indigo-100 rounded-full blur-3xl opacity-60" />
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[46rem] h-[26rem] bg-gradient-to-b from-indigo-50/60 via-white to-transparent" />
+        </div>
 
-            {/* Headline */}
-            <h1 className="text-4xl md:text-5xl lg:text-6.5xl font-black text-white tracking-tight leading-1.07 font-display uppercase" id="hero-headline">
-              Stop Overpaying on <br />
-              <span className="text-[#2DD4BF] drop-shadow-[0_0_15px_rgba(45,212,191,0.2)]">Freight. Automatically.</span>
-            </h1>
-
-            {/* Description subheader */}
-            <p className="text-sm md:text-base lg:text-lg text-[#94A3B8] max-w-xl font-sans leading-relaxed" id="hero-subheadline">
-              FreightAudit AI catches billing errors across every invoice — before you pay them. Powered by AI. Backed by your contracts.
-            </p>
-
-            {/* Action buttons CTAs */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-2" id="hero-cta-box">
-              <button
-                onClick={() => navigateTo('/auth/signup')}
-                className="bg-[#2DD4BF] hover:bg-[#14B8A4] text-black font-mono text-sm uppercase font-black tracking-wider py-3.5 px-8 rounded-lg transition-all cursor-pointer shadow-[0_0_20px_rgba(45,212,191,0.45)] text-center flex items-center justify-center gap-2"
-                id="hero-primary-cta"
-              >
-                <span>Start Free Audit</span>
-                <MoveRight size={16} />
-              </button>
-              <a
-                href="#how-it-works-anchor"
-                className="border border-[#2DD4BF]/40 hover:border-[#2DD4BF] text-[#2DD4BF] font-mono text-sm uppercase font-black tracking-wider py-3.5 px-7 rounded-lg transition-all text-center"
-                id="hero-secondary-cta"
-              >
-                See How It Works
-              </a>
-            </div>
-
-          </div>
-
-          {/* Right CSS Mock interactive Invoice Card */}
-          <div className="lg:col-span-5 relative" id="hero-visual-container">
-            <div className="absolute inset-0 bg-radial-gradient from-[#2DD4BF]/20 to-transparent blur-3xl opacity-30 select-none pointer-events-none" />
-            
-            {/* Visual Card body representation */}
-            <div className="relative bg-[#111827] border border-teal-900/40 rounded-xl shadow-2xl p-5 md:p-6 w-full max-w-md mx-auto transform hover:-translate-y-1 transition-all">
-              
-              {/* Fake Invoice Meta */}
-              <div className="flex justify-between items-start border-b border-[#1F2D45] pb-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-red-400 animate-ping" />
-                    <span className="font-mono text-[9px] font-black uppercase tracking-wider text-red-400">Audit Discrepancy Found</span>
-                  </div>
-                  <h4 className="text-white text-xs font-bold uppercase tracking-wide">Carrier Ledger FDX-98774</h4>
-                  <p className="text-[9px] text-zinc-500 font-mono">Invoice Date: 2026-06-03</p>
-                </div>
-                <span className="font-mono text-[10px] font-black tracking-wide text-[#2DD4BF] bg-[#2DD4BF]/10 border border-[#2DD4BF]/25 py-1 px-2.5 rounded">
-                  FEDEX EXPRESS
+        <div className="max-w-6xl mx-auto px-6 pt-14 pb-10 relative">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            {/* HERO text content */}
+            <div className="lg:col-span-7">
+              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" />
+                <span className={`font-mono text-[12px] font-semibold tracking-wide text-indigo-700 uppercase`}>
+                  Structured Clarity
                 </span>
               </div>
 
-              {/* Rows Comparison details container */}
-              <div className="pt-4 space-y-3.5">
-                
-                {/* Row 1 - Verified Normal Row */}
-                <div className="text-xs space-y-1">
-                  <div className="flex justify-between text-[10px] font-mono uppercase text-slate-500 font-bold">
-                    <span>Base Freight Charge</span>
-                    <span className="text-[#10B981] flex items-center gap-1">✓ Verified</span>
-                  </div>
-                  <div className="flex justify-between text-white font-mono bg-[#0A0F1E]/40 p-1.5 px-2.5 rounded border border-[#1F2D45]/20">
-                    <span className="text-zinc-400">Billed: $1,240.00</span>
-                    <span className="text-zinc-500 font-medium">Contract expected: $1,240.00</span>
-                  </div>
-                </div>
+              <h1 className="mt-5 text-4xl md:text-5xl font-bold tracking-tight text-gray-900 leading-[1.08]">
+                Freight invoices, automatically
+                <span className="block text-indigo-600">audited for correctness.</span>
+              </h1>
 
-                {/* Row 2 - FLAGGED Overcharge Row */}
-                <div className="text-xs space-y-1 border border-red-900/40 p-2.5 bg-amber-500/5 rounded-lg">
-                  <div className="flex justify-between text-[10px] font-mono uppercase text-amber-500 font-black">
-                    <span>Fuel Surcharge index %</span>
-                    <span className="text-[#EF4444] animate-pulse font-mono font-black flex items-center gap-1">⚠ OVERCHARGE DETECTED</span>
-                  </div>
-                  <div className="flex justify-between text-white font-mono bg-[#0A0F1E]/80 p-1.5 px-2 rounded">
-                    <span className="text-zinc-300 font-black">Billed: $385.10</span>
-                    <span className="text-[#10B981] font-extrabold">Contract: $112.50</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[10px] font-mono pt-1 text-[#EF4444] font-black">
-                    <span>Rate Sheet discrepancy:</span>
-                    <span className="bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">+$272.60 overcharge</span>
-                  </div>
-                </div>
+              <p className="mt-4 text-gray-600 text-base md:text-lg leading-relaxed max-w-xl">
+                FreightAudit AI catches billing errors across every invoice—before you pay them. AI extraction meets
+                contract matching, with audit-ready flags.
+              </p>
 
-                {/* Row 3 - Regular Row verified */}
-                <div className="text-xs space-y-1">
-                  <div className="flex justify-between text-[10px] font-mono uppercase text-slate-500 font-bold">
-                    <span>Residential Delivery Accessory</span>
-                    <span className="text-[#10B981] flex items-center gap-1">✓ Verified</span>
-                  </div>
-                  <div className="flex justify-between text-white font-mono bg-[#0A0F1E]/40 p-1.5 px-2.5 rounded border border-[#1F2D45]/20">
-                    <span className="text-zinc-400">Billed: $85.00</span>
-                    <span className="text-zinc-500 font-medium">Contract expected: $85.00</span>
-                  </div>
-                </div>
+              <div className="mt-7 flex flex-col sm:flex-row gap-3 sm:items-center">
+                <Link
+                  href="/auth/signup"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-3 rounded-xl inline-flex items-center justify-center gap-2 transition-colors duration-150"
+                >
+                  Start Free Audit
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
 
+                <a
+                  href="#how"
+                  className="border border-indigo-200 hover:border-indigo-300 text-indigo-700 font-semibold text-sm px-4 py-3 rounded-xl inline-flex items-center gap-2 transition-colors duration-150 bg-white hover:bg-indigo-50/30"
+                >
+                  See How It Works
+                  <ChevronRight className="w-4 h-4" />
+                </a>
               </div>
 
-              {/* Total Card footer */}
-              <div className="border-t border-[#1F2D45] mt-4 pt-4 flex justify-between items-center font-mono">
-                <span className="text-zinc-400 text-[10px] uppercase font-bold">Net Audited Difference:</span>
-                <span className="text-[#EF4444] text-xs font-black bg-[#EF4444]/15 px-2.5 py-1 rounded border border-red-500/20">
-                  -$272.60 Disputed Amount
-                </span>
+              <div className="mt-7 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-2xl border border-gray-100 bg-white">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center">
+                    <Shield className="w-4 h-4" />
+                  </div>
+                  <div className={`font-mono text-[12px] font-semibold text-gray-900 uppercase tracking-wider mt-3`}>Audit-ready</div>
+                  <div className="text-sm text-gray-600 mt-1">Clear references & checks</div>
+                </div>
+                <div className="p-4 rounded-2xl border border-gray-100 bg-white">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div className={`font-mono text-[12px] font-semibold text-gray-900 uppercase tracking-wider mt-3`}>Minutes</div>
+                  <div className="text-sm text-gray-600 mt-1">Fast review workflow</div>
+                </div>
+                <div className="p-4 rounded-2xl border border-gray-100 bg-white">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center">
+                    <BarChart3 className="w-4 h-4" />
+                  </div>
+                  <div className={`font-mono text-[12px] font-semibold text-gray-900 uppercase tracking-wider mt-3`}>Saves money</div>
+                  <div className="text-sm text-gray-600 mt-1">Reduce overpayments</div>
+                </div>
               </div>
+            </div>
 
+            {/* ── HERO VISUAL (mock invoice table) ── */}
+            <div className="lg:col-span-5">
+              <div className="relative">
+                <div className="absolute -inset-6 bg-gradient-to-b from-indigo-50 to-transparent rounded-[2rem] blur-xl opacity-60" />
+                <div className="relative bg-white border border-gray-100 rounded-[1.5rem] shadow-sm overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-600/10 border border-indigo-200 flex items-center justify-center">
+                        <FileText className="w-4 h-4 text-indigo-600" />
+                      </div>
+                      <div>
+                        <div className={`font-mono text-[12px] font-semibold text-gray-900 uppercase tracking-wider`}>
+                          Invoice • FDX-98774
+                        </div>
+                        <div className="text-sm text-gray-500">Contract checks with audit trail</div>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 border border-red-100">
+                      <AlertTriangle className="w-4 h-4 text-red-600" />
+                      <span className={`font-mono text-[12px] font-semibold text-red-700`}>1 flagged</span>
+                    </span>
+                  </div>
+
+                  <div className="p-4">
+                    <div className="overflow-hidden rounded-2xl border border-gray-100">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-gray-50">
+                          <tr className={`font-mono text-[11px] uppercase text-gray-500`}>
+                            <th className="px-4 py-3 font-semibold">Line item</th>
+                            <th className="px-4 py-3 font-semibold">Billed</th>
+                            <th className="px-4 py-3 font-semibold">Expected</th>
+                            <th className="px-4 py-3 font-semibold">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          <tr>
+                            <td className="px-4 py-3 text-gray-800 font-medium">
+                              Base Freight Charge
+                              <div className={`font-mono text-[11px] text-gray-500 mt-1`}>Verified against contract</div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-800 font-semibold">$1,240.00</td>
+                            <td className="px-4 py-3 text-gray-600">$1,240.00</td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100">
+                                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                                <span className={`font-mono text-[12px] font-semibold text-emerald-700`}>
+                                  Verified
+                                </span>
+                              </span>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="px-4 py-3 text-gray-800 font-medium">
+                              Fuel Surcharge index %
+                              <div className={`font-mono text-[11px] text-red-600 mt-1`}>Rate sheet discrepancy</div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-800 font-semibold">$385.10</td>
+                            <td className="px-4 py-3 text-gray-600">$112.50</td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-100">
+                                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                                <span className={`font-mono text-[12px] font-semibold text-amber-700`}>
+                                  Review
+                                </span>
+                              </span>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="px-4 py-3 text-gray-800 font-medium">
+                              Residential Delivery Accessory
+                              <div className={`font-mono text-[11px] text-gray-500 mt-1`}>Verified against contract</div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-800 font-semibold">$85.00</td>
+                            <td className="px-4 py-3 text-gray-600">$85.00</td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100">
+                                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                                <span className={`font-mono text-[12px] font-semibold text-emerald-700`}>
+                                  Verified
+                                </span>
+                              </span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="mt-4 rounded-2xl bg-gray-50 border border-gray-100 px-4 py-3 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                          <Zap className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className={`font-mono text-[12px] font-semibold text-gray-900 uppercase tracking-wider`}>
+                            Net audited difference
+                          </div>
+                          <div className="text-sm text-gray-600 mt-1">Flagged amount with references</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className={`font-mono text-[12px] font-semibold uppercase tracking-wider text-gray-500`}>
+                          Disputed
+                        </div>
+                        <div className="text-lg font-bold text-red-600 leading-none mt-1">-$272.60</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
+          {/* ── STATS BAR ── */}
+          <div className="mt-12 border border-gray-100 rounded-[1.25rem] bg-white">
+            <div className="grid grid-cols-1 md:grid-cols-3">
+              <div className="px-6 py-6 text-center">
+                <div className="text-4xl font-extrabold tracking-tight text-indigo-600">$2.4B+</div>
+                <div className={`font-mono text-[12px] uppercase tracking-wider font-semibold text-gray-500 mt-3`}>
+                  Industry overcharges annually
+                </div>
+              </div>
+              <div className="px-6 py-6 border-t md:border-t-0 md:border-l border-gray-100 text-center">
+                <div className="text-4xl font-extrabold tracking-tight text-indigo-600">15–25%</div>
+                <div className={`font-mono text-[12px] uppercase tracking-wider font-semibold text-gray-500 mt-3`}>
+                  Average invoice error rate
+                </div>
+              </div>
+              <div className="px-6 py-6 border-t md:border-t-0 md:border-l border-gray-100 text-center">
+                <div className="text-4xl font-extrabold tracking-tight text-indigo-600">$13.11</div>
+                <div className={`font-mono text-[12px] uppercase tracking-wider font-semibold text-gray-500 mt-3`}>
+                  Cost to manually process one invoice
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </header>
+      </div>
 
-      {/* SECTION 3 — Stats Bar */}
-      <section className="bg-[#111827] border-y border-[#1F2D45]" id="landing-stats-bar">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-4 items-center">
-            
-            {/* Stat 1 */}
-            <div className="flex flex-col items-center justify-center text-center space-y-1 md:border-r border-[#1F2D45] md:pr-4">
-              <span className="text-4xl font-extrabold font-display text-[#2DD4BF] tracking-tight">
-                $2.4B+
-              </span>
-              <span className="text-xs text-[#94A3B8] font-mono uppercase tracking-widest font-bold">
-                Industry overcharges annually
-              </span>
+      {/* ── HOW IT WORKS ── */}
+      <section id="how" className="max-w-6xl mx-auto px-6 py-20">
+        <div className="text-center space-y-2">
+          <h2 className="text-3xl font-bold tracking-tight text-gray-900">Audit Intelligence in Action</h2>
+          <p className={`font-mono text-[12px] uppercase tracking-widest font-semibold text-indigo-600`}>
+            three seamless steps to automate invoice audits
+          </p>
+        </div>
+
+        <div className="mt-12 relative">
+          <div className="hidden lg:block absolute top-1/2 left-12 right-12 h-px bg-gradient-to-r from-indigo-200 via-indigo-300 to-indigo-200" />
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+            <div className="bg-white border border-gray-100 rounded-2xl p-7 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto">
+                <span className={`font-mono text-sm font-bold text-indigo-700`}>1</span>
+              </div>
+              <div className="mt-4 w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto text-indigo-700">
+                <Upload className="w-5 h-5" />
+              </div>
+              <h3 className="mt-5 text-sm font-bold text-gray-900">Upload Your Invoice</h3>
+              <p className="mt-2 text-sm text-gray-600">Drop PDF invoices via our secure portal.</p>
             </div>
 
-            {/* Stat 2 */}
-            <div className="flex flex-col items-center justify-center text-center space-y-1 md:border-r border-[#1F2D45] px-4">
-              <span className="text-4xl font-extrabold font-display text-[#2DD4BF] tracking-tight">
-                15-25%
-              </span>
-              <span className="text-xs text-[#94A3B8] font-mono uppercase tracking-widest font-bold">
-                Average invoice error rate
-              </span>
+            <div className="bg-white border border-gray-100 rounded-2xl p-7 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto">
+                <span className={`font-mono text-sm font-bold text-indigo-700`}>2</span>
+              </div>
+              <div className="mt-4 w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto text-indigo-700">
+                <FileText className="w-5 h-5" />
+              </div>
+              <h3 className="mt-5 text-sm font-bold text-gray-900">AI Audits in Minutes</h3>
+              <p className="mt-2 text-sm text-gray-600">Compares every line item against your contracts.</p>
             </div>
 
-            {/* Stat 3 */}
-            <div className="flex flex-col items-center justify-center text-center space-y-1 pl-4">
-              <span className="text-4xl font-extrabold font-display text-[#2DD4BF] tracking-tight">
-                $13.11
-              </span>
-              <span className="text-xs text-[#94A3B8] font-mono uppercase tracking-widest font-bold">
-                Cost to manually process one invoice
-              </span>
+            <div className="bg-white border border-gray-100 rounded-2xl p-7 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto">
+                <span className={`font-mono text-sm font-bold text-indigo-700`}>3</span>
+              </div>
+              <div className="mt-4 w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto text-indigo-700">
+                <CheckCircle className="w-5 h-5" />
+              </div>
+              <h3 className="mt-5 text-sm font-bold text-gray-900">Catch Overcharges</h3>
+              <p className="mt-2 text-sm text-gray-600">Review flags and generate disputes instantly.</p>
             </div>
-
           </div>
         </div>
       </section>
 
-      {/* SECTION 4 — How It Works (3 Steps) */}
-      <section className="py-20 bg-[#0A0F1E] border-b border-[#1F2D45]/20 scroll-mt-18" id="how-it-works-anchor">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          
+      {/* ── FEATURES ── */}
+      <section id="features" className="py-20 border-t border-gray-100">
+        <div className="max-w-6xl mx-auto px-6">
           <div className="text-center space-y-2">
-            <h2 className="text-3xl font-black text-white font-display uppercase tracking-tight">
-              Audit Intelligence in Action
-            </h2>
-            <p className="text-xs font-mono uppercase tracking-widest text-[#2DD4BF] font-black">
-              three seamless steps to automate invoice audits
-            </p>
-          </div>
-
-          <div className="relative" id="steps-card-deck">
-            
-            {/* Connecting lines between nodes on desktop sizes */}
-            <div className="hidden lg:block absolute top-[44%] left-24 right-24 h-[1px] bg-gradient-to-r from-teal-500/10 via-[#2DD4BF]/30 to-teal-500/10 z-0" />
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
-              
-              {/* Step 1 */}
-              <div className="bg-[#111827] border border-teal-900/40 rounded-xl p-6.5 text-center flex flex-col items-center space-y-4 hover:border-[#2DD4BF]/50 transition-all">
-                <div className="h-12 w-12 rounded-full bg-[#2DD4BF]/10 text-[#2DD4BF] border border-[#2DD4BF]/30 flex items-center justify-center font-mono text-base font-black shadow-[0_0_15px_rgba(45,212,191,0.1)]">
-                  1
-                </div>
-                <div className="bg-[#1C2537] p-3 rounded-xl text-[#2DD4BF] border border-[#1F2D45]/40 mt-1">
-                  <UploadCloud size={24} />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-black text-white font-display uppercase tracking-tight">Upload Your Invoice</h3>
-                  <p className="text-xs text-[#94A3B8] font-sans">
-                    Drop PDF invoices via our secure portal.
-                  </p>
-                </div>
-              </div>
-
-              {/* Step 2 */}
-              <div className="bg-[#111827] border border-teal-900/40 rounded-xl p-6.5 text-center flex flex-col items-center space-y-4 hover:border-[#2DD4BF]/50 transition-all">
-                <div className="h-12 w-12 rounded-full bg-[#2DD4BF]/10 text-[#2DD4BF] border border-[#2DD4BF]/30 flex items-center justify-center font-mono text-base font-black shadow-[0_0_15px_rgba(45,212,191,0.1)]">
-                  2
-                </div>
-                <div className="bg-[#1C2537] p-3 rounded-xl text-[#2DD4BF] border border-[#1F2D45]/40 mt-1">
-                  <Cpu size={24} />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-black text-white font-display uppercase tracking-tight">AI Audits in Minutes</h3>
-                  <p className="text-xs text-[#94A3B8] font-sans">
-                    Compares every line item against your contracts.
-                  </p>
-                </div>
-              </div>
-
-              {/* Step 3 */}
-              <div className="bg-[#111827] border border-teal-900/40 rounded-xl p-6.5 text-center flex flex-col items-center space-y-4 hover:border-[#2DD4BF]/50 transition-all">
-                <div className="h-12 w-12 rounded-full bg-[#2DD4BF]/10 text-[#2DD4BF] border border-[#2DD4BF]/30 flex items-center justify-center font-mono text-base font-black shadow-[0_0_15px_rgba(45,212,191,0.1)]">
-                  3
-                </div>
-                <div className="bg-[#1C2537] p-3 rounded-xl text-[#2DD4BF] border border-[#1F2D45]/40 mt-1">
-                  <CheckCircle size={24} />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-black text-white font-display uppercase tracking-tight">Catch Overcharges</h3>
-                  <p className="text-xs text-[#94A3B8] font-sans">
-                    Review flags and generate disputes instantly.
-                  </p>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* SECTION 5 — Features (3 Cards) */}
-      <section className="py-20 bg-[#0A0F1E] border-b border-[#1F2D45]/20" id="landing-features">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          
-          <div className="text-center space-y-2">
-            <h2 className="text-3xl font-black text-white font-display uppercase tracking-tight animate-fade-in">
-              What FreightAudit AI Does
-            </h2>
-            <p className="text-xs font-mono uppercase tracking-widest text-[#2DD4BF] font-black">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900">What FreightAudit AI Does</h2>
+            <p className={`font-mono text-[12px] uppercase tracking-widest font-semibold text-indigo-600`}>
               Enterprise grade tools crafted for logistic billing integrity
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8" id="features-grid">
-            
-            {/* Feature 1 */}
-            <div className="bg-[#111827] border border-[#1F2D45]/60 hover:border-[#2DD4BF]/40 rounded-xl p-6 relative flex flex-col space-y-4 transition-all">
-              <div className="bg-[#2DD4BF]/10 text-[#2DD4BF] border border-[#2DD4BF]/20 p-3.5 rounded-xl self-start">
-                <Search size={24} />
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white border border-gray-100 rounded-2xl p-7 relative">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700">
+                <Shield className="w-5 h-5" />
               </div>
-              <div className="space-y-1.5 flex-grow">
-                <h3 className="text-sm font-black text-white font-display uppercase tracking-tight">Smart Extraction</h3>
-                <p className="text-xs text-[#94A3B8] leading-relaxed">
-                  AI reads any invoice format, any carrier. No standard templates, regex rules, or structured mapping schedules required.
-                </p>
-              </div>
+              <h3 className="mt-5 text-base font-bold text-gray-900">Smart Extraction</h3>
+              <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+                AI reads any invoice format, any carrier—no standard templates, regex rules, or rigid mapping schedules required.
+              </p>
             </div>
 
-            {/* Feature 2 */}
-            <div className="bg-[#111827] border border-[#1F2D45]/60 hover:border-[#2DD4BF]/40 rounded-xl p-6 relative flex flex-col space-y-4 transition-all">
-              <div className="bg-[#2DD4BF]/10 text-[#2DD4BF] border border-[#2DD4BF]/20 p-3.5 rounded-xl self-start">
-                <FileCheck size={24} />
+            <div className="bg-white border border-gray-100 rounded-2xl p-7 relative">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700">
+                <BarChart3 className="w-5 h-5" />
               </div>
-              <div className="space-y-1.5 flex-grow">
-                <h3 className="text-sm font-black text-white font-display uppercase tracking-tight">Contract Matching</h3>
-                <p className="text-xs text-[#94A3B8] leading-relaxed">
-                  Every charge verified against your active carrier rate agreements. We check base freights, accessorial fees, weight steps, and fuel scale models.
-                </p>
-              </div>
+              <h3 className="mt-5 text-base font-bold text-gray-900">Contract Matching</h3>
+              <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+                Every charge verified against your active carrier rate agreements. We check base freights, accessorial fees, weight steps, and fuel scale models.
+              </p>
             </div>
 
-            {/* Feature 3 */}
-            <div className="bg-[#111827] border border-[#1F2D45]/60 hover:border-[#2DD4BF]/40 rounded-xl p-6 relative flex flex-col space-y-4 transition-all">
-              <div className="bg-[#2DD4BF]/10 text-[#2DD4BF] border border-[#2DD4BF]/20 p-3.5 rounded-xl self-start">
-                <Zap size={24} />
+            <div className="bg-white border border-gray-100 rounded-2xl p-7 relative">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700">
+                <Zap className="w-5 h-5" />
               </div>
-              <div className="space-y-1.5 flex-grow">
-                <h3 className="text-sm font-black text-white font-display uppercase tracking-tight">Dispute Automation</h3>
-                <p className="text-xs text-[#94A3B8] leading-relaxed">
-                  One-click dispute letters generated dynamically with exact references. Sent in seconds to bypass lengthy back-and-forth arguments.
-                </p>
-              </div>
+              <h3 className="mt-5 text-base font-bold text-gray-900">Dispute Automation</h3>
+              <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+                One-click dispute letters generated dynamically with exact references. Sent in seconds to bypass lengthy back-and-forth arguments.
+              </p>
             </div>
-
           </div>
-
         </div>
       </section>
 
-      {/* SECTION 6 — CTA Banner */}
-      <section className="py-20 bg-gradient-to-r from-teal-950 to-[#0A0F1E] relative border-b border-[#1F2D45]/30 overflow-hidden" id="landing-cta-banner">
-        <div className="absolute inset-0 bg-[#000]/25 mix-blend-multiply pointer-events-none select-none" />
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8 relative z-10">
-          
-          <div className="space-y-3">
-            <h2 className="text-3xl md:text-4.5xl font-black text-white font-display tracking-tight uppercase leading-none">
-              Ready to stop the leakage?
-            </h2>
-            <p className="text-[#94A3B8] text-sm md:text-base max-w-xl mx-auto font-sans">
+      {/* ── CTA BANNER ── */}
+      <section className="py-20 bg-gradient-to-r from-indigo-950 to-indigo-900 border-t border-indigo-900">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="rounded-[2rem] bg-white/5 border border-white/10 px-6 md:px-10 py-10 md:py-12 text-center">
+            <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight uppercase">Ready to stop the leakage?</h2>
+            <p className="mt-3 text-indigo-100/90 text-sm md:text-base max-w-2xl mx-auto">
               Join logistics teams already saving thousands of dollars per month by catching carrier billing errors early.
             </p>
-          </div>
 
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-            <button
-              onClick={() => navigateTo('/auth/signup')}
-              className="w-full sm:w-auto bg-[#2DD4BF] hover:bg-[#14B8A4] text-black font-mono text-sm uppercase font-black tracking-wider py-4 px-10 rounded-lg shadow-[0_0_20px_rgba(45,212,191,0.45)] cursor-pointer transition-all"
-              id="cta-create-account"
-            >
-              Create Free Account
-            </button>
+            <div className="mt-8 flex items-center justify-center">
+              <Link
+                href="/auth/signup"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-10 py-4 rounded-xl transition-colors duration-150 inline-flex items-center gap-2"
+              >
+                Get started free
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
-
         </div>
       </section>
 
-      {/* SECTION 7 — Footer */}
-      <footer className="bg-[#111827] border-t border-[#1F2D45] py-12" id="landing-footer">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
-          
-          {/* Logo brand and copyrights */}
+      {/* ── FOOTER ── */}
+      <footer className="bg-white border-t border-gray-100 py-12">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="text-center sm:text-left space-y-2">
-            <div className="flex items-center justify-center sm:justify-start gap-1.5">
-              <span className="font-display font-black text-xs text-white uppercase tracking-tight">FreightAudit AI</span>
+            <div className="flex items-center justify-center sm:justify-start gap-2">
+              <span className="font-bold text-gray-900 text-sm">FreightAudit AI</span>
             </div>
-            <p className="text-[11px] text-[#475569] font-mono">
-              &copy; 2025 FreightAudit AI. All rights reserved. Registered SaaS.
-            </p>
+            <p className={`font-mono text-[11px] text-gray-500`}>&copy; 2025 FreightAudit AI. All rights reserved.</p>
           </div>
 
-          {/* Nav links */}
-          <div className="flex flex-wrap justify-center gap-6 text-[#94A3B8] font-mono text-[10px] uppercase font-bold tracking-wider" id="footer-links">
-            <span className="hover:text-[#2DD4BF] cursor-pointer transition-colors">Privacy Policy</span>
-            <span className="text-[#1F2D45]">•</span>
-            <span className="hover:text-[#2DD4BF] cursor-pointer transition-colors">Terms of Service</span>
-            <span className="text-[#1F2D45]">•</span>
-            <span className="hover:text-[#2DD4BF] cursor-pointer transition-colors" onClick={() => navigateTo('#landing-features')}>Features</span>
+          <div className="flex flex-wrap justify-center gap-6 text-gray-500 font-semibold text-[12px]">
+            <a href="#" className="hover:text-gray-900 transition-colors duration-150">Privacy Policy</a>
+            <span className="text-gray-300">•</span>
+            <a href="#" className="hover:text-gray-900 transition-colors duration-150">Terms of Service</a>
+            <span className="text-gray-300">•</span>
+            <a href="#features" className="hover:text-indigo-600 transition-colors duration-150">Features</a>
           </div>
-
         </div>
       </footer>
-
     </div>
-  );
+  )
 }
+
