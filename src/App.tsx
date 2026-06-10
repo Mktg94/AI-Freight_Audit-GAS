@@ -106,8 +106,8 @@ export default function App() {
     window.addEventListener('show-toast', handleToastEvent);
     
     // 2. Load active Supabase Auth sessions if variables exist
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
     
     if (supabaseUrl && supabaseKey && !supabaseUrl.includes('placeholder') && !supabaseKey.includes('placeholder')) {
       const supabase = createClient();
@@ -342,8 +342,8 @@ export default function App() {
   const handleLogOut = async () => {
     localStorage.removeItem('fa_mock_session');
     
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
     if (supabaseUrl && supabaseKey && !supabaseUrl.includes('placeholder') && !supabaseKey.includes('placeholder')) {
       const supabase = createClient();
       await supabase.auth.signOut();

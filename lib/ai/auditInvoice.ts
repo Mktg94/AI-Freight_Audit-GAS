@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenAI } from '@google/genai';
 import { Contract } from '../../types';
 import { ExtractedLineItem } from './extractInvoice';
 
@@ -16,11 +16,11 @@ export async function auditLineItems(
   lineItems: ExtractedLineItem[],
   contract: Contract
 ): Promise<LineItemAuditResult[]> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
 
-  if (apiKey && apiKey !== "" && apiKey !== "MY_ANTHROPIC_API_KEY") {
+  if (apiKey && apiKey !== "" && apiKey !== "MY_GEMINI_API_KEY") {
     try {
-      const anthropic = new Anthropic({ apiKey });
+      const ai = new GoogleGenAI({ apiKey });
       const prompt = `You are a freight billing auditor. Compare each invoice line item against the contract rates.
 Return ONLY a valid JSON array, no explanation:
 [
@@ -39,13 +39,15 @@ Invoice line items: ${JSON.stringify(lineItems, null, 2)}
 Flag only items with clear, calculable discrepancies. 
 For charges not in the contract: status "not_in_contract", confidence 0.7.`;
 
-      const response = await anthropic.messages.create({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: prompt }]
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json'
+        }
       });
 
-      const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
+      const responseText = response.text || '';
       const cleaned = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
       const rawResults = JSON.parse(cleaned);
 
@@ -61,11 +63,10 @@ For charges not in the contract: status "not_in_contract", confidence 0.7.`;
         }));
       }
     } catch (e) {
-      console.error("Anthropic auditing failed, running robust mechanical fallback:", e);
+      console.error("Gemini auditing failed, running robust mechanical fallback:", e);
     }
   }
 
-  // Programmatic fallback
   return runFallbackLineItemAudit(lineItems, contract);
 }
 
@@ -82,13 +83,9 @@ function runFallbackLineItemAudit(
     let message = "Rated correctly matching active carrier files.";
     let confidence = 0.95;
 
-    // 1. Base rate audit logic
     if (desc.includes("base") || desc.includes("freight") || desc.includes("shipping") || desc.includes("haul")) {
-      // Look for custom rule or standard contract variables
       const min_charge = contract.minimum_charge || 120;
-      // In typical LTL, base is computed or min charge is applied
       if (billed > min_charge && min_charge > 0) {
-        // Supposing there was a 15% discount missing
         expected = min_charge; 
         discrepancy = billed - expected;
         status = "overcharged";
@@ -96,10 +93,8 @@ function runFallbackLineItemAudit(
         confidence = 0.96;
       }
     } 
-    // 2. Fuel surcharges
     else if (desc.includes("fuel")) {
       const fuelPct = contract.fuel_surcharge_pct || 0.14;
-      // Fuel is usually 14% of the base. Let's say we expect around 14% of the billed base
       const expectedFuel = Math.round(850 * fuelPct); 
       if (billed > expectedFuel) {
         expected = expectedFuel;
@@ -109,7 +104,6 @@ function runFallbackLineItemAudit(
         confidence = 0.98;
       }
     } 
-    // 3. Known accessorial charges
     else if (desc.includes("residential")) {
       const contractRate = contract.residential_surcharge;
       if (billed > contractRate) {
@@ -156,7 +150,6 @@ function runFallbackLineItemAudit(
         confidence = 0.99;
       }
     }
-    // 4. Non-contracted unknown charges
     else if (billed > 20) {
       status = "not_in_contract";
       expected = 0;

@@ -22,8 +22,8 @@ export default function ContractPageClient({ initialContracts: ssrContracts }: C
   // Sync state modifications from local events
   useEffect(() => {
     // Check if real database connection is established
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
     if (supabaseUrl && supabaseKey && !supabaseUrl.includes('placeholder') && !supabaseKey.includes('placeholder')) {
       setIsRealSupabase(true);
     }

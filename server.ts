@@ -3,10 +3,9 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { initialContracts, initialInvoices, initialLineItems, initialAuditLogs } from "./src/fakeData";
-import { extractInvoiceData } from "./lib/ai/extractInvoice";
 import { auditLineItems } from "./lib/ai/auditInvoice";
 import multer from "multer";
-import { PDFParse } from "pdf-parse";
+import { processInvoiceWithVeryfi } from "./lib/ai/veryfi";
 
 const uploadRouter = multer({ storage: multer.memoryStorage() });
 
@@ -92,17 +91,27 @@ app.post("/api/invoices/upload", uploadRouter.single('file'), async (req, res) =
       return res.status(400).json({ error: "Missing contract id for reference comparison" });
     }
 
-    let pdfText = "";
+    let extracted: any;
     try {
-      const parser = new PDFParse({ data: file.buffer });
-      const result = await parser.getText();
-      pdfText = result.text || "";
-    } catch (pdfErr: any) {
-      console.warn("Express pdf-parse extraction fallback active:", pdfErr.message);
-      pdfText = `Invoice: mock. Weight: 2500 lbs. Dist: 540 miles. Cost: 1100. FedEx LTL.`;
+      extracted = await processInvoiceWithVeryfi(file.buffer, file.originalname);
+    } catch (ocrErr: any) {
+      console.warn("Veryfi extraction failed, using fallback mock data:", ocrErr.message);
+      extracted = {
+        carrier_name: "FedEx Freight",
+        invoice_number: `INV-${Date.now()}`,
+        invoice_date: new Date().toISOString().split('T')[0],
+        shipment_date: new Date().toISOString().split('T')[0],
+        origin: "Memphis TN, USA",
+        destination: "Dallas TX, USA",
+        weight_lbs: 2500,
+        distance_miles: 540,
+        line_items: [
+          { description: "Base Transit LTL Freight", billed_amount: 675.00, quantity: 1, unit: "flat" },
+          { description: "Fuel Surcharge", billed_amount: 162.00, quantity: 1, unit: "flat" },
+        ],
+        total_billed: 1100.00,
+      };
     }
-
-    const extracted = await extractInvoiceData(pdfText);
 
     const insertedInvoice: any = {
       id: `inv-mock-${Math.random().toString(36).substr(2, 9)}`,
@@ -123,7 +132,7 @@ app.post("/api/invoices/upload", uploadRouter.single('file'), async (req, res) =
       total_approved: 0,
       total_savings: 0,
       uploaded_at: new Date().toISOString(),
-      raw_extracted_text: pdfText,
+      raw_extracted_text: "",
       extracted_data: extracted
     };
 
@@ -207,16 +216,27 @@ app.post("/api/invoices/batch-upload", uploadRouter.array('files'), async (req, 
     const invoiceIds: string[] = [];
 
     for (const file of files) {
-      let pdfText = "";
+      let extracted: any;
       try {
-        const parser = new PDFParse({ data: file.buffer });
-        const result = await parser.getText();
-        pdfText = result.text || "";
-      } catch {
-        pdfText = `Invoice: mock. Weight: 2500 lbs. Dist: 540 miles. Cost: 1100. FedEx LTL.`;
+        extracted = await processInvoiceWithVeryfi(file.buffer, file.originalname);
+      } catch (ocrErr: any) {
+        console.warn("Veryfi extraction failed in batch, using fallback:", ocrErr.message);
+        extracted = {
+          carrier_name: "FedEx Freight",
+          invoice_number: `INV-${Date.now()}`,
+          invoice_date: new Date().toISOString().split('T')[0],
+          shipment_date: new Date().toISOString().split('T')[0],
+          origin: "Memphis TN, USA",
+          destination: "Dallas TX, USA",
+          weight_lbs: 2500,
+          distance_miles: 540,
+          line_items: [
+            { description: "Base Transit LTL Freight", billed_amount: 675.00, quantity: 1, unit: "flat" },
+            { description: "Fuel Surcharge", billed_amount: 162.00, quantity: 1, unit: "flat" },
+          ],
+          total_billed: 1100.00,
+        };
       }
-
-      const extracted = await extractInvoiceData(pdfText);
       const insertedInvoice: any = {
         id: `inv-mock-${Math.random().toString(36).substr(2, 9)}`,
         org_id: 'org-101',
@@ -237,7 +257,7 @@ app.post("/api/invoices/batch-upload", uploadRouter.array('files'), async (req, 
         total_savings: 0,
         batch_id: batchId,
         uploaded_at: new Date().toISOString(),
-        raw_extracted_text: pdfText,
+        raw_extracted_text: "",
         extracted_data: extracted
       };
 

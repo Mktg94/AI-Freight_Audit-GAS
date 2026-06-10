@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenAI } from '@google/genai';
 
 export interface DisputeParams {
@@ -30,42 +29,13 @@ Write a professional dispute letter that:
 
 Return only the letter text. No JSON. No markdown formatting.`;
 
-  // 1. Try Anthropic if API Key is set
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (anthropicKey && anthropicKey !== "" && anthropicKey !== "MY_ANTHROPIC_API_KEY") {
-    try {
-      const anthropic = new Anthropic({ apiKey: anthropicKey });
-      const response = await anthropic.messages.create({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 2500,
-        messages: [{ role: 'user', content: prompt }],
-        system: systemPrompt,
-      });
-
-      const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
-      if (responseText && responseText.trim().length > 0) {
-        return responseText.trim();
-      }
-    } catch (err) {
-      console.warn("Dispute generation: Anthropic failed, falling back to Gemini.", err);
-    }
-  }
-
-  // 2. Try Gemini if API Key is set
   const geminiKey = process.env.GEMINI_API_KEY;
-  if (geminiKey && geminiKey !== "") {
+  if (geminiKey && geminiKey !== "" && geminiKey !== "MY_GEMINI_API_KEY") {
     try {
-      const ai = new GoogleGenAI({
-        apiKey: geminiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          }
-        }
-      });
+      const ai = new GoogleGenAI({ apiKey: geminiKey });
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           systemInstruction: systemPrompt,
@@ -81,7 +51,6 @@ Return only the letter text. No JSON. No markdown formatting.`;
     }
   }
 
-  // 3. Robust programmatic fallback template
   let itemsTable = "Description | Billed | Contract Rate | Difference\n";
   itemsTable += "--------------------------------------------------------\n";
   try {

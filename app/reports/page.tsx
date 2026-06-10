@@ -64,8 +64,8 @@ export default function ReportsPage() {
 
   const fetchDataset = async () => {
     setLoading(true);
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
     const hasSupabaseKeys = supabaseUrl && supabaseKey && !supabaseUrl.includes('placeholder') && !supabaseKey.includes('placeholder');
 
     const { from: fromDate, to: toDate } = dateLimits;
