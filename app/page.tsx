@@ -1,4 +1,4 @@
-const navigate = (href: string) => (e: React.MouseEvent) => { e.preventDefault(); window.history.pushState({}, '', href); window.dispatchEvent(new Event('popstate')) }
+const navigate = (href: string) => (e: MouseEvent) => { e.preventDefault(); window.history.pushState({}, '', href); window.dispatchEvent(new Event('popstate')) }
 import {
   ArrowRight,
   Upload,
