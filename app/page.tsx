@@ -1,4 +1,4 @@
-import { useCallback } from "react"
+import type { ReactNode } from "react"
 import {
   ArrowRight,
   Upload,
@@ -14,7 +14,7 @@ import {
   Menu,
 } from "lucide-react"
 
-const Link = ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) => (
+const Link = ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => (
   <a href={href} className={className} onClick={(e) => { e.preventDefault(); window.history.pushState({}, '', href); window.dispatchEvent(new Event('popstate')); }}>{children}</a>
 )
 
