@@ -806,4 +806,218 @@ app.post("/api/disputes/:id/send", (req, res) => {
   res.json({ success: true, data: memoryDisputes[idx] });
 });
 
+app.get("/api/team/members", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("org_members")
+      .select("*, auth_users:user_id(email, raw_user_meta_data->>full_name)")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const members = (data || []).map((m: any) => ({
+      id: m.id,
+      org_id: m.org_id,
+      user_id: m.user_id,
+      full_name: m.auth_users?.full_name || m.email || "Unknown",
+      email: m.email || "",
+      role: m.role,
+      status: m.status,
+      created_at: m.created_at,
+    }));
+
+    res.json({ success: true, data: members });
+  } catch (err: any) {
+    console.warn("Failed to fetch team members:", err.message);
+    res.json({ success: true, data: [] });
+  }
+});
+
+app.patch("/api/team/:memberId", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { memberId } = req.params;
+    const { role } = req.body;
+    const { data, error } = await supabase
+      .from("org_members")
+      .update({ role })
+      .eq("id", memberId)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update member", details: err.message });
+  }
+});
+
+app.delete("/api/team/:memberId", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { memberId } = req.params;
+    const { data, error } = await supabase
+      .from("org_members")
+      .update({ status: "suspended" })
+      .eq("id", memberId)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to suspend member", details: err.message });
+  }
+});
+
+app.post("/api/team/invite", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { email, role } = req.body;
+    if (!email || !role) {
+      return res.status(400).json({ error: "Missing email or role" });
+    }
+
+    const { data: existingUser } = await supabase
+      .from("auth.users")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
+
+    const userId = existingUser?.id || `pending-${Date.now()}`;
+    const { data: orgData } = await supabase
+      .from("organizations")
+      .select("id, seat_limit")
+      .limit(1)
+      .single();
+
+    if (!orgData) {
+      return res.status(400).json({ error: "No organization found" });
+    }
+
+    const { count } = await supabase
+      .from("org_members")
+      .select("*", { count: "exact", head: true })
+      .eq("org_id", orgData.id)
+      .neq("status", "suspended");
+
+    if (count !== null && count >= (orgData.seat_limit || 10)) {
+      return res.status(403).json({ error: "seat_limit_reached", limit: orgData.seat_limit });
+    }
+
+    const { data, error } = await supabase
+      .from("org_members")
+      .insert({
+        org_id: orgData.id,
+        user_id: userId,
+        role,
+        status: "invited",
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to invite member", details: err.message });
+  }
+});
+
+app.get("/api/settings/organization", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("*")
+      .limit(1)
+      .single();
+    if (error) {
+      return res.json({
+        success: true,
+        data: {
+          name: "My Organization",
+          seat_limit: 3,
+          invoice_limit_per_month: 100,
+          invoices_used_this_month: 0,
+          plan: "Starter",
+          billing_reset_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      });
+    }
+    res.json({ success: true, data });
+  } catch (err: any) {
+    res.json({
+      success: true,
+      data: {
+        name: "My Organization",
+        seat_limit: 3,
+        invoice_limit_per_month: 100,
+        invoices_used_this_month: 0,
+        plan: "Starter",
+      },
+    });
+  }
+});
+
+app.patch("/api/settings/organization", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { name, plan } = req.body;
+    const updates: any = {};
+    if (name) updates.name = name;
+    if (plan) {
+      updates.plan = plan;
+      const lowerPlan = plan.toLowerCase();
+      if (lowerPlan === "starter") {
+        updates.seat_limit = 3;
+        updates.invoice_limit_per_month = 100;
+      } else if (lowerPlan === "professional") {
+        updates.seat_limit = 10;
+        updates.invoice_limit_per_month = 500;
+      } else if (lowerPlan === "enterprise") {
+        updates.seat_limit = 999;
+        updates.invoice_limit_per_month = 99999;
+      }
+    }
+
+    const { data, error } = await supabase
+      .from("organizations")
+      .update(updates)
+      .neq("id", "00000000-0000-0000-0000-000000000000")
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update organization", details: err.message });
+  }
+});
+
+app.get("/api/settings/integrations", (_req, res) => {
+  res.json({
+    success: true,
+    data: {
+      resend_connected: !!process.env.RESEND_API_KEY,
+      resend_api_key: process.env.RESEND_API_KEY || "",
+      gemini_connected: !!process.env.GEMINI_API_KEY,
+      gemini_api_key: process.env.GEMINI_API_KEY || "",
+    },
+  });
+});
+
+app.patch("/api/settings/integrations", (req, res) => {
+  const { resend_api_key } = req.body;
+  if (resend_api_key !== undefined) {
+    process.env.RESEND_API_KEY = resend_api_key;
+  }
+  res.json({
+    success: true,
+    data: {
+      resend_connected: !!process.env.RESEND_API_KEY,
+      resend_api_key: process.env.RESEND_API_KEY || "",
+      gemini_connected: !!process.env.GEMINI_API_KEY,
+    },
+  });
+});
+
 export default app;
