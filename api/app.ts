@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import express from "express";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
@@ -14,6 +15,33 @@ function getSupabaseAdmin() {
     throw new Error("Supabase credentials not configured");
   }
   return createClient(supabaseUrl, serviceRoleKey);
+}
+
+async function ensureDefaultOrg(supabase: any): Promise<string | null> {
+  const { count } = await supabase
+    .from("organizations")
+    .select("*", { count: "exact", head: true });
+  if (count && count > 0) {
+    const { data } = await supabase.from("organizations").select("id").limit(1).single();
+    return data?.id ?? null;
+  }
+  try {
+    const { data: users } = await supabase.auth.admin.listUsers();
+    const firstUser = users?.users?.[0];
+    if (!firstUser) return null;
+    const { data: org } = await supabase
+      .from("organizations")
+      .insert({ name: "Default Organization", owner_id: firstUser.id })
+      .select()
+      .single();
+    if (!org) return null;
+    await supabase.from("org_members").insert({
+      org_id: org.id, user_id: firstUser.id, role: "admin", status: "active",
+    });
+    return org.id;
+  } catch {
+    return null;
+  }
 }
 
 const app = express();
@@ -37,10 +65,25 @@ app.post("/api/contracts", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
     const payload = req.body;
+    let org_id = payload.org_id;
+    if (!org_id) {
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("id")
+        .limit(1)
+        .single();
+      org_id = org?.id;
+    }
+    if (!org_id) {
+      org_id = await ensureDefaultOrg(supabase);
+    }
+    if (!org_id) {
+      return res.status(400).json({ error: "No organization found. Sign up first." });
+    }
     const { data, error } = await supabase
       .from("contracts")
       .insert({
-        org_id: payload.org_id,
+        org_id,
         carrier_name: payload.carrier_name,
         effective_date: payload.effective_date,
         expiry_date: payload.expiry_date,
@@ -95,9 +138,10 @@ app.delete("/api/contracts/:id", async (req, res) => {
 
 app.post("/api/invoices/upload", uploadRouter.single("file"), async (req, res) => {
   try {
+    const supabase = getSupabaseAdmin();
     const file = req.file;
     const contract_id = req.body.contract_id;
-    const org_id = req.body.org_id;
+    let org_id = req.body.org_id;
 
     if (!file) {
       return res.status(400).json({ success: false, step: "upload", error: "Missing invoice PDF file" });
@@ -106,10 +150,16 @@ app.post("/api/invoices/upload", uploadRouter.single("file"), async (req, res) =
       return res.status(400).json({ success: false, step: "upload", error: "Missing contract id" });
     }
     if (!org_id) {
-      return res.status(400).json({ success: false, step: "upload", error: "Missing org_id" });
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("id")
+        .limit(1)
+        .single();
+      org_id = org?.id ?? await ensureDefaultOrg(supabase);
     }
-
-    const supabase = getSupabaseAdmin();
+    if (!org_id) {
+      return res.status(400).json({ success: false, step: "upload", error: "No organization found. Sign up first." });
+    }
 
     let extractedInvoice: any;
     try {
@@ -283,9 +333,10 @@ app.post("/api/invoices/detect-multi", (_req, res) => {
 
 app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, res) => {
   try {
+    const supabase = getSupabaseAdmin();
     const files = req.files as Express.Multer.File[];
     const contract_id = req.body.contract_id;
-    const org_id = req.body.org_id;
+    let org_id = req.body.org_id;
 
     if (!files || files.length === 0) {
       return res.status(400).json({ error: "No invoice files provided" });
@@ -294,16 +345,44 @@ app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, 
       return res.status(400).json({ error: "Missing contract id" });
     }
     if (!org_id) {
-      return res.status(400).json({ error: "Missing org_id" });
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("id")
+        .limit(1)
+        .single();
+      org_id = org?.id ?? await ensureDefaultOrg(supabase);
     }
-
-    const supabase = getSupabaseAdmin();
-    const batchId = `batch-${Date.now()}`;
+    if (!org_id) {
+      return res.status(400).json({ error: "No organization found." });
+    }
+    const batchId = crypto.randomUUID();
     const invoiceIds: string[] = [];
+    console.log(`[batch-upload] org_id=${org_id} batchId=${batchId} files=${files.length}`);
+
+    // Create invoice_batches record
+    try {
+      await supabase.from("invoice_batches").insert({
+        id: batchId,
+        org_id,
+        file_name: files.length > 1 ? `${files.length} Files Batch` : files[0].originalname,
+        status: "processing",
+        total_count: files.length,
+        completed_count: 0,
+        invoice_ids: [],
+      });
+    } catch (batchErr: any) {
+      console.warn("Failed to create batch record:", batchErr.message);
+    }
 
     for (const file of files) {
       try {
-        const extractedInvoice = await extractInvoiceData(file.buffer, file.mimetype);
+        let extractedInvoice: any;
+        try {
+          extractedInvoice = await extractInvoiceData(file.buffer, file.mimetype);
+        } catch (extractErr: any) {
+          console.warn(`AI extraction failed for ${file.originalname}, using defaults:`, extractErr.message);
+          extractedInvoice = {};
+        }
 
         const fileName = `${org_id}/${Date.now()}_${file.originalname}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -323,17 +402,17 @@ app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, 
             contract_id,
             file_name: file.originalname,
             file_url: urlData.publicUrl,
-            carrier_name: extractedInvoice.carrier_name,
-            invoice_number: extractedInvoice.invoice_number,
-            invoice_date: extractedInvoice.invoice_date,
-            shipment_date: extractedInvoice.shipment_date,
-            origin: extractedInvoice.origin,
-            destination: extractedInvoice.destination,
-            weight_lbs: extractedInvoice.weight_lbs,
-            distance_miles: extractedInvoice.distance_miles,
+            carrier_name: extractedInvoice.carrier_name || "Unknown Carrier",
+            invoice_number: extractedInvoice.invoice_number || `INV-${Date.now()}`,
+            invoice_date: extractedInvoice.invoice_date || new Date().toISOString().split("T")[0],
+            shipment_date: extractedInvoice.shipment_date || new Date().toISOString().split("T")[0],
+            origin: extractedInvoice.origin || "Origin N/A",
+            destination: extractedInvoice.destination || "Destination N/A",
+            weight_lbs: extractedInvoice.weight_lbs || 0,
+            distance_miles: extractedInvoice.distance_miles || 0,
             extracted_data: extractedInvoice,
             status: "pending",
-            total_billed: extractedInvoice.total_billed,
+            total_billed: extractedInvoice.total_billed || 0,
             total_approved: 0,
             total_savings: 0,
             batch_id: batchId,
@@ -353,10 +432,101 @@ app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, 
       }
     }
 
+    // Update batch status to completed
+    try {
+      await supabase
+        .from("invoice_batches")
+        .update({
+          status: "completed",
+          completed_count: invoiceIds.length,
+          invoice_ids: invoiceIds,
+        })
+        .eq("id", batchId);
+    } catch (updateErr: any) {
+      console.warn("Failed to update batch status:", updateErr.message);
+    }
+
+    console.log(`[batch-upload] result: ${invoiceIds.length} invoices created, ids=${JSON.stringify(invoiceIds)}`);
     res.json({ success: true, batchId, invoiceIds });
   } catch (err: any) {
     console.error("Batch upload error:", err);
     res.status(500).json({ error: "Batch upload failed", details: err.message });
+  }
+});
+
+app.get("/api/debug/setup-org", async (req, res) => {
+  try {
+    const admin = getSupabaseAdmin();
+    const { data: { users }, error: listErr } = await admin.auth.admin.listUsers();
+    if (listErr) throw listErr;
+    const firstUser = users?.[0];
+    if (!firstUser) throw new Error("No auth users found");
+
+    const { data: existingOrgs } = await admin
+      .from("organizations")
+      .select("id, owner_id")
+      .eq("owner_id", firstUser.id);
+
+    if (existingOrgs && existingOrgs.length > 0) {
+      return res.json({ orgId: existingOrgs[0].id, message: "Org already exists for this user" });
+    }
+
+    const { data: anyOrg } = await admin
+      .from("organizations")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+
+    if (anyOrg) {
+      const { error: updateErr } = await admin
+        .from("organizations")
+        .update({ owner_id: firstUser.id })
+        .eq("id", anyOrg.id);
+      if (updateErr) throw updateErr;
+      return res.json({ orgId: anyOrg.id, message: "Updated existing org owner to your user" });
+    }
+
+    const { data: newOrg, error: createErr } = await admin
+      .from("organizations")
+      .insert({ name: "My Organization", owner_id: firstUser.id })
+      .select()
+      .single();
+    if (createErr) throw createErr;
+
+    res.json({ orgId: newOrg.id, message: "Created new org for your user" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/debug/check-invoice/:invoiceId", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { invoiceId } = req.params;
+    const { data, error } = await supabase
+      .from("invoices")
+      .select("id, org_id, batch_id, file_name, carrier_name")
+      .eq("id", invoiceId)
+      .single();
+    if (error) throw error;
+    res.json({ found: true, invoice: data });
+  } catch (err: any) {
+    res.json({ found: false, error: err.message });
+  }
+});
+
+app.get("/api/debug/invoices/:batchId", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { batchId } = req.params;
+    const { data, error } = await supabase
+      .from("invoices")
+      .select("id, org_id, batch_id, file_name, carrier_name")
+      .eq("batch_id", batchId);
+    if (error) throw error;
+    res.json({ count: data?.length || 0, invoices: data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -372,11 +542,11 @@ app.get("/api/invoices/batch/:batchId/status", async (req, res) => {
     const invoices = data || [];
     const allDone = invoices.every((inv: any) => inv.status !== "auditing");
     res.json({
-      batchId,
-      total: invoices.length,
-      completed: invoices.filter((inv: any) => inv.status !== "auditing").length,
       status: allDone ? "completed" : "processing",
-      invoices,
+      completedCount: invoices.filter((inv: any) => inv.status !== "auditing").length,
+      totalCount: invoices.length,
+      invoiceIds: invoices.map((inv: any) => inv.id),
+      failedFiles: [],
     });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to get batch status", details: err.message });

@@ -16,7 +16,7 @@ const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [role, setRoleState] = useState<UserRole>('admin');
-  const [orgId, setOrgId] = useState<string>('org-101');
+  const [orgId, setOrgId] = useState<string>('');
   const [userId, setUserId] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -38,16 +38,24 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
           setUserId(user.id);
 
           // Find organization
-          const { data: orgData, error: orgErr } = await supabase
-            .from('organizations')
-            .select('id')
-            .limit(1)
-            .maybeSingle();
+          let activeOrgId = '';
+          try {
+            const { data: orgData } = await supabase
+              .from('organizations')
+              .select('id')
+              .limit(1)
+              .maybeSingle();
+            if (orgData?.id) {
+              setOrgId(orgData.id);
+              activeOrgId = orgData.id;
+            }
+          } catch {
+            // organizations table may not exist yet
+          }
 
-          let activeOrgId = 'org-101';
-          if (orgData && !orgErr) {
-            setOrgId(orgData.id);
-            activeOrgId = orgData.id;
+          if (!activeOrgId) {
+            setRoleState('admin');
+            return;
           }
 
           // Check if there is an override in localStorage first for demonstration/evaluation
@@ -56,17 +64,23 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
             setRoleState(cachedRole as UserRole);
           } else {
             // Find role in org_members
-            const { data: memberData, error: memberErr } = await supabase
-              .from('org_members')
-              .select('role')
-              .eq('org_id', activeOrgId)
-              .eq('user_id', user.id)
-              .maybeSingle();
+            try {
+              const { data: memberData } = await supabase
+                .from('org_members')
+                .select('role')
+                .eq('org_id', activeOrgId)
+                .eq('user_id', user.id)
+                .maybeSingle();
 
-            if (memberData?.role && !memberErr) {
-              setRoleState(memberData.role as UserRole);
-            } else {
-              // Fall back to owner check
+              if (memberData?.role) {
+                setRoleState(memberData.role as UserRole);
+                return;
+              }
+            } catch {
+              // org_members table may not exist yet
+            }
+
+            try {
               const { data: orgOwnerData } = await supabase
                 .from('organizations')
                 .select('owner_id')
@@ -76,8 +90,10 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
               if (orgOwnerData?.owner_id === user.id) {
                 setRoleState('admin');
               } else {
-                setRoleState('admin'); // sandbox default
+                setRoleState('admin');
               }
+            } catch {
+              setRoleState('admin');
             }
           }
         } else {

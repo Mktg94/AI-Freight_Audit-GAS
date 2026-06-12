@@ -27,7 +27,11 @@ export default function InvoicesPage() {
         .select('*')
         .order('uploaded_at', { ascending: false });
 
-      if (!error && data) {
+      if (error) {
+        console.error("Invoices query error:", error);
+      }
+      if (data) {
+        console.log(`InvoicesPage: loaded ${data.length} invoices`);
         setInvoices(data);
       }
     } catch (err) {

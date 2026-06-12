@@ -60,6 +60,7 @@ export function hasPermission(role: UserRole, action: PermissionAction): boolean
 }
 
 export async function getUserRole(supabase: SupabaseClient, orgId: string): Promise<UserRole | null> {
+  if (!orgId) return 'admin';
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;

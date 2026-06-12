@@ -149,18 +149,22 @@ ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 -- -------------------------------------------------------------
 -- RLS Policies: organizations
 -- -------------------------------------------------------------
+DROP POLICY IF EXISTS "Users can select their own organizations" ON public.organizations;
 CREATE POLICY "Users can select their own organizations" 
     ON public.organizations FOR SELECT 
     USING (owner_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can insert their own organizations" ON public.organizations;
 CREATE POLICY "Users can insert their own organizations" 
     ON public.organizations FOR INSERT 
     WITH CHECK (owner_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can update their own organizations" ON public.organizations;
 CREATE POLICY "Users can update their own organizations" 
     ON public.organizations FOR UPDATE 
     USING (owner_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can delete their own organizations" ON public.organizations;
 CREATE POLICY "Users can delete their own organizations" 
     ON public.organizations FOR DELETE 
     USING (owner_id = auth.uid());
@@ -168,8 +172,167 @@ CREATE POLICY "Users can delete their own organizations"
 -- -------------------------------------------------------------
 -- RLS Policies: contracts
 -- -------------------------------------------------------------
+DROP POLICY IF EXISTS "Users can select contracts of their organization" ON public.contracts;
 CREATE POLICY "Users can select contracts of their organization" 
     ON public.contracts FOR SELECT 
+    USING (org_id = public.get_user_org_id());
+
+DROP POLICY IF EXISTS "Users can insert contracts into their organization" ON public.contracts;
+CREATE POLICY "Users can insert contracts into their organization" 
+    ON public.contracts FOR INSERT 
+    WITH CHECK (org_id = public.get_user_org_id());
+
+DROP POLICY IF EXISTS "Users can update contracts of their organization" ON public.contracts;
+CREATE POLICY "Users can update contracts of their organization" 
+    ON public.contracts FOR UPDATE 
+    USING (org_id = public.get_user_org_id());
+
+DROP POLICY IF EXISTS "Users can delete contracts of their organization" ON public.contracts;
+CREATE POLICY "Users can delete contracts of their organization" 
+    ON public.contracts FOR DELETE 
+    USING (org_id = public.get_user_org_id());
+
+-- -------------------------------------------------------------
+-- RLS Policies: invoices
+-- -------------------------------------------------------------
+DROP POLICY IF EXISTS "Users can select invoices of their organization" ON public.invoices;
+CREATE POLICY "Users can select invoices of their organization" 
+    ON public.invoices FOR SELECT 
+    USING (org_id = public.get_user_org_id());
+
+DROP POLICY IF EXISTS "Users can insert invoices into their organization" ON public.invoices;
+CREATE POLICY "Users can insert invoices into their organization" 
+    ON public.invoices FOR INSERT 
+    WITH CHECK (org_id = public.get_user_org_id());
+
+DROP POLICY IF EXISTS "Users can update invoices of their organization" ON public.invoices;
+CREATE POLICY "Users can update invoices of their organization" 
+    ON public.invoices FOR UPDATE 
+    USING (org_id = public.get_user_org_id());
+
+DROP POLICY IF EXISTS "Users can delete invoices of their organization" ON public.invoices;
+CREATE POLICY "Users can delete invoices of their organization" 
+    ON public.invoices FOR DELETE 
+    USING (org_id = public.get_user_org_id());
+
+-- -------------------------------------------------------------
+-- RLS Policies: line_items
+-- Since line_items references invoices, RLS should verify the invoice belongs to the user's organization.
+-- -------------------------------------------------------------
+DROP POLICY IF EXISTS "Users can select line items for their organization invoices" ON public.line_items;
+CREATE POLICY "Users can select line items for their organization invoices" 
+    ON public.line_items FOR SELECT 
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.invoices 
+            WHERE invoices.id = line_items.invoice_id 
+              AND invoices.org_id = public.get_user_org_id()
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can insert line items for their organization invoices" ON public.line_items;
+CREATE POLICY "Users can insert line items for their organization invoices" 
+    ON public.line_items FOR INSERT 
+    WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.invoices 
+            WHERE invoices.id = line_items.invoice_id 
+              AND invoices.org_id = public.get_user_org_id()
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can update line items of their organization invoices" ON public.line_items;
+CREATE POLICY "Users can update line items of their organization invoices" 
+    ON public.line_items FOR UPDATE 
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.invoices 
+            WHERE invoices.id = line_items.invoice_id 
+              AND invoices.org_id = public.get_user_org_id()
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can delete line items of their organization invoices" ON public.line_items;
+CREATE POLICY "Users can delete line items of their organization invoices" 
+    ON public.line_items FOR DELETE 
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.invoices 
+            WHERE invoices.id = line_items.invoice_id 
+              AND invoices.org_id = public.get_user_org_id()
+        )
+    );
+
+-- -------------------------------------------------------------
+-- RLS Policies: disputes
+-- -------------------------------------------------------------
+DROP POLICY IF EXISTS "Users can select disputes of their organization" ON public.disputes;
+CREATE POLICY "Users can select disputes of their organization" 
+    ON public.disputes FOR SELECT 
+    USING (org_id = public.get_user_org_id());
+
+DROP POLICY IF EXISTS "Users can insert disputes into their organization" ON public.disputes;
+CREATE POLICY "Users can insert disputes into their organization" 
+    ON public.disputes FOR INSERT 
+    WITH CHECK (org_id = public.get_user_org_id());
+
+DROP POLICY IF EXISTS "Users can update disputes of their organization" ON public.disputes;
+CREATE POLICY "Users can update disputes of their organization" 
+    ON public.disputes FOR UPDATE 
+    USING (org_id = public.get_user_org_id());
+
+DROP POLICY IF EXISTS "Users can delete disputes of their organization" ON public.disputes;
+CREATE POLICY "Users can delete disputes of their organization" 
+    ON public.disputes FOR DELETE 
+    USING (org_id = public.get_user_org_id());
+
+-- -------------------------------------------------------------
+-- RLS Policies: audit_logs
+-- -------------------------------------------------------------
+DROP POLICY IF EXISTS "Users can select audit logs of their organization" ON public.audit_logs;
+CREATE POLICY "Users can select audit logs of their organization" 
+    ON public.audit_logs FOR SELECT 
+    USING (org_id = public.get_user_org_id());
+
+DROP POLICY IF EXISTS "Users can insert audit logs into their organization" ON public.audit_logs;
+CREATE POLICY "Users can insert audit logs into their organization" 
+    ON public.audit_logs FOR INSERT 
+    WITH CHECK (org_id = public.get_user_org_id());
+
+DROP POLICY IF EXISTS "Users can update audit logs of their organization" ON public.audit_logs;
+CREATE POLICY "Users can update audit logs of their organization" 
+    ON public.audit_logs FOR UPDATE 
+    USING (org_id = public.get_user_org_id());
+
+DROP POLICY IF EXISTS "Users can delete audit logs of their organization" ON public.audit_logs;
+CREATE POLICY "Users can delete audit logs of their organization" 
+    ON public.audit_logs FOR DELETE 
+    USING (org_id = public.get_user_org_id());
+
+
+-- =============================================================
+-- 7. Create table: org_members
+-- =============================================================
+CREATE TABLE IF NOT EXISTS public.org_members (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'finance_clerk' CHECK (role IN ('admin', 'logistics_manager', 'finance_clerk', 'operations_coordinator')),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'invited', 'suspended')),
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    UNIQUE (org_id, user_id)
+);
+
+ALTER TABLE public.org_members ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can select organization members of their organization" ON public.org_members;
+CREATE POLICY "Users can select organization members of their organization" 
+    ON public.org_members FOR SELECT 
+    USING (org_id = public.get_user_org_id());
+
+DROP POLICY IF EXISTS "Admin can modify organization members of their organization" ON public.org_members;
+CREATE POLICY "Admin can modify organization members of their organization"
+    ON public.org_members FOR ALL
     USING (org_id = public.get_user_org_id());
 
 CREATE POLICY "Users can insert contracts into their organization" 
@@ -346,14 +509,17 @@ CREATE TABLE IF NOT EXISTS public.invoice_batches (
 
 ALTER TABLE public.invoice_batches ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can select invoice batches of their organization" ON public.invoice_batches;
 CREATE POLICY "Users can select invoice batches of their organization"
     ON public.invoice_batches FOR SELECT
     USING (org_id = public.get_user_org_id());
 
+DROP POLICY IF EXISTS "Users can insert invoice batches into their organization" ON public.invoice_batches;
 CREATE POLICY "Users can insert invoice batches into their organization"
     ON public.invoice_batches FOR INSERT
     WITH CHECK (org_id = public.get_user_org_id());
 
+DROP POLICY IF EXISTS "Users can update invoice batches of their organization" ON public.invoice_batches;
 CREATE POLICY "Users can update invoice batches of their organization"
     ON public.invoice_batches FOR UPDATE
     USING (org_id = public.get_user_org_id());
