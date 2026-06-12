@@ -17,7 +17,7 @@ const RoleContext = createContext<RoleContextType | undefined>(undefined);
 export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [role, setRoleState] = useState<UserRole>('admin');
   const [orgId, setOrgId] = useState<string>('org-101');
-  const [userId, setUserId] = useState<string>('usr-mock');
+  const [userId, setUserId] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Allow setting the role (great for testing inside Settings/Appearance)

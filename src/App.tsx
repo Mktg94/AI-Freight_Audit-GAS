@@ -1,9 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Contract, Invoice, Dispute, AuditLog, LineItem, AuditResult } from '../types';
-import { 
-  initialContracts, initialInvoices, initialLineItems, 
-  initialDisputes, initialAuditLogs, mockOrganization 
-} from './fakeData';
 import ContractList from './components/ContractList';
 import ContractPageClient from '../components/contracts/ContractPageClient';
 import ContractForm from '../components/contracts/ContractForm';
@@ -35,11 +31,11 @@ export default function App() {
   const [welcomeToast, setWelcomeToast] = useState<{ show: boolean; title: string; message: string } | null>(null);
 
   // Unified State Engine
-  const [contracts, setContracts] = useState<Contract[]>(initialContracts);
-  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
-  const [lineItems, setLineItems] = useState<LineItem[]>(initialLineItems);
-  const [disputes, setDisputes] = useState<Dispute[]>(initialDisputes);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialAuditLogs);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
   // Global theme persistence loader
   useEffect(() => {
@@ -466,19 +462,19 @@ export default function App() {
 
   // Loaded user dashboard view (when authenticated)
   return (
-    <div className="min-h-screen bg-[#0A0F1E] text-[#F1F5F9] font-sans antialiased relative">
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased relative">
       
       {/* Visual notification toasts */}
       {welcomeToast && (
-        <div className="fixed top-6 right-6 bg-[#111827] border-2 border-emerald-500/40 rounded-xl p-4 max-w-sm w-full shadow-[0_0_20px_rgba(16,185,129,0.25)] z-[999] flex gap-3 animate-bounce">
-          <div className="bg-[#10B981]/15 text-[#10B981] p-1.5 h-8 w-8 rounded-lg flex items-center justify-center font-bold shrink-0">
+        <div className="fixed top-6 right-6 bg-white border border-gray-200 rounded-xl p-4 max-w-sm w-full shadow-lg z-[999] flex gap-3">
+          <div className="bg-green-50 text-green-600 p-1.5 h-8 w-8 rounded-lg flex items-center justify-center font-bold shrink-0">
             ✓
           </div>
           <div className="flex-grow space-y-0.5">
-            <span className="text-xs font-bold text-white block uppercase tracking-wide">{welcomeToast.title}</span>
-            <span className="text-[10px] text-[#94A3B8] block">{welcomeToast.message}</span>
+            <span className="text-xs font-bold text-gray-900 block uppercase tracking-wide">{welcomeToast.title}</span>
+            <span className="text-[10px] text-gray-500 block">{welcomeToast.message}</span>
           </div>
-          <button onClick={() => setWelcomeToast(null)} className="text-zinc-500 hover:text-white p-0.5 self-start">
+          <button onClick={() => setWelcomeToast(null)} className="text-gray-400 hover:text-gray-600 p-0.5 self-start cursor-pointer">
             <X size={14} />
           </button>
         </div>

@@ -1,4 +1,4 @@
-const navigate = (href: string) => (e: MouseEvent) => { e.preventDefault(); window.history.pushState({}, '', href); window.dispatchEvent(new Event('popstate')) }
+import React from "react"
 import {
   ArrowRight,
   Upload,
@@ -13,6 +13,8 @@ import {
   ChevronRight,
   Menu,
 } from "lucide-react"
+
+const navigate = (href: string) => (e: React.MouseEvent) => { e.preventDefault(); window.history.pushState({}, '', href); window.dispatchEvent(new Event('popstate')) }
 
 
 

@@ -17,44 +17,41 @@ export default function StatCard({
   value,
   icon: Icon,
   trend,
-  valueColorClass = 'text-white'
+  valueColorClass = 'text-gray-900'
 }: StatCardProps) {
   return (
-    <div 
-      className="bg-[#111827] border border-teal-900/40 rounded-xl p-5 relative overflow-hidden transition-all duration-300 hover:border-teal-700/60 hover:shadow-[0_0_20px_rgba(45,212,191,0.05)]" 
+    <div
+      className="bg-white rounded-2xl border border-gray-100 p-5 relative overflow-hidden transition-colors duration-200 hover:border-gray-200 hover:shadow-sm"
       id={`stat-card-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      {/* Glow highlight in background */}
-      <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/5 blur-2xl rounded-full pointer-events-none" />
+      <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 blur-2xl rounded-full pointer-events-none" />
 
       <div className="flex justify-between items-start">
-        <span className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider font-mono">
+        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
           {title}
         </span>
-        <div className="p-2 bg-teal-950/30 border border-teal-500/10 rounded-lg text-[#2DD4BF]">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 bg-indigo-50 border border-indigo-100 text-indigo-600">
           <Icon size={16} />
         </div>
       </div>
 
-      <div className="mt-4 space-y-1">
-        <h3 className={`text-2xl font-black tracking-tight font-display ${valueColorClass}`}>
-          {value}
-        </h3>
+      <div className="mt-2 space-y-1">
+        <h3 className={`text-2xl font-bold font-mono text-gray-900 tabular-nums ${valueColorClass}`}> {value}</h3>
 
         {trend && (
-          <div className="flex items-center gap-1 text-[11px] font-semibold font-mono">
+          <div className="inline-flex items-center gap-1 text-xs font-medium font-mono mt-1">
             {trend.direction === 'up' ? (
-              <span className="flex items-center text-[#10B981]">
+              <span className="inline-flex items-center gap-1 text-green-600">
                 <ArrowUpRight size={13} className="shrink-0" />
                 <span>+{trend.pct}%</span>
               </span>
             ) : (
-              <span className="flex items-center text-[#EF4444]">
+              <span className="inline-flex items-center gap-1 text-red-500">
                 <ArrowDownRight size={13} className="shrink-0" />
                 <span>-{trend.pct}%</span>
               </span>
             )}
-            <span className="text-[#475569]">vs last month</span>
+            <span className="text-gray-400">vs last month</span>
           </div>
         )}
       </div>

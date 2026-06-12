@@ -9,28 +9,28 @@ export default function InvoiceStatusBadge({ status }: InvoiceStatusBadgeProps) 
   const config: Record<InvoiceStatus, { label: string; containerClass: string; dotClass: string }> = {
     pending: {
       label: 'Pending',
-      containerClass: 'bg-zinc-800/60 text-zinc-400 border border-zinc-700/50',
-      dotClass: 'bg-zinc-500'
+      containerClass: 'bg-gray-50 text-gray-600 border-gray-200',
+      dotClass: 'bg-gray-500'
     },
     auditing: {
       label: 'Auditing',
-      containerClass: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
-      dotClass: 'bg-blue-400 animate-pulse'
+      containerClass: 'bg-blue-50 text-blue-700 border-blue-200',
+      dotClass: 'bg-blue-500 animate-pulse'
     },
     flagged: {
       label: 'Flagged',
-      containerClass: 'bg-amber-500/10 text-[#F59E0B] border border-amber-500/20 font-bold',
-      dotClass: 'bg-[#F59E0B]'
+      containerClass: 'bg-amber-50 text-amber-700 border-amber-200',
+      dotClass: 'bg-amber-500'
     },
     approved: {
       label: 'Approved',
-      containerClass: 'bg-emerald-500/10 text-[#10B981] border border-emerald-500/20',
-      dotClass: 'bg-[#10B981]'
+      containerClass: 'bg-green-50 text-green-700 border-green-200',
+      dotClass: 'bg-green-600'
     },
     disputed: {
       label: 'Disputed',
-      containerClass: 'bg-red-500/10 text-[#EF4444] border border-red-500/20 font-bold',
-      dotClass: 'bg-[#EF4444]'
+      containerClass: 'bg-red-50 text-red-600 border-red-200',
+      dotClass: 'bg-red-500'
     }
   };
 

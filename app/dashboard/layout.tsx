@@ -12,17 +12,13 @@ export default function DashboardLayout({
 }) {
   return (
     <RoleProvider>
-      <div className="min-h-screen bg-[#0A0F1E] flex text-[#F1F5F9] overflow-x-hidden" id="dashboard-app-layout">
-        {/* Navigation sidebar */}
+      <div className="min-h-screen bg-gray-50 flex overflow-x-hidden" id="dashboard-app-layout">
         <Sidebar />
 
-        {/* Main workspace arena */}
-        <div className="flex-1 flex flex-col md:pl-[240px] min-h-screen w-full">
-          {/* Persistent contextual header navigation */}
+        <div className="flex-1 flex flex-col md:pl-[220px] min-h-screen w-full">
           <TopBar />
 
-          {/* Core application content routing */}
-          <main className="flex-grow p-4 md:p-8 w-full max-w-7xl mx-auto space-y-6">
+          <main className="flex-grow w-full">
             {children}
           </main>
         </div>
@@ -30,4 +26,3 @@ export default function DashboardLayout({
     </RoleProvider>
   );
 }
-

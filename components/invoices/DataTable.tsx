@@ -12,7 +12,6 @@ interface DataTableProps {
   data: Invoice[];
   loading?: boolean;
   onViewInvoice?: (id: string) => void;
-  // Batch filtering option: 'all' | 'single' | 'batch'
   batchFilter?: string;
 }
 
@@ -29,20 +28,17 @@ export default function DataTable({
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [expandedBatches, setExpandedBatches] = useState<Record<string, boolean>>({});
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 35; // Larger page size to accommodate grouped batches and child list nodes
+  const itemsPerPage = 35;
 
-  // Sort and filter data
   const filteredAndSortedData = useMemo(() => {
     let list = [...data];
 
-    // Apply batchFilter logic
     if (batchFilter === 'single') {
       list = list.filter(inv => !inv.batch_id && (!inv.source || !inv.source.startsWith('Batch —')));
     } else if (batchFilter === 'batch') {
       list = list.filter(inv => !!inv.batch_id || (inv.source && inv.source.startsWith('Batch —')));
     }
 
-    // Sort original
     return list.sort((a, b) => {
       let valA = a[sortField];
       let valB = b[sortField];
@@ -64,16 +60,14 @@ export default function DataTable({
     });
   }, [data, sortField, sortDirection, batchFilter]);
 
-  // Expand / collapse helper
   const toggleBatch = (batchId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setExpandedBatches(prev => ({
       ...prev,
-      [batchId]: prev[batchId] === false ? true : false // default is expanded (true)
+      [batchId]: prev[batchId] === false ? true : false
     }));
   };
 
-  // Sorting handler
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -83,8 +77,6 @@ export default function DataTable({
     }
   };
 
-  // Group invoices structure
-  // Formats rows list to either simple elements or batches!
   const renderedTableItems = useMemo(() => {
     const items: Array<{
       type: 'single' | 'batch_header' | 'batch_child';
@@ -100,14 +92,11 @@ export default function DataTable({
       const bId = invoice.batch_id;
       
       if (!bId) {
-        // Standard single invoice
         items.push({ type: 'single', invoice });
       } else {
-        // Batch item
-        if (processedBatchIds.has(bId)) return; // already compiled
+        if (processedBatchIds.has(bId)) return;
         processedBatchIds.add(bId);
 
-        // Fetch all elements inside this batch
         const siblings = filteredAndSortedData.filter(i => i.batch_id === bId);
         const filename = invoice.source?.replace('Batch — ', '') || 'Bulk Load Dataset';
 
@@ -131,7 +120,6 @@ export default function DataTable({
     return items;
   }, [filteredAndSortedData]);
 
-  // Pagination bounds
   const totalItems = renderedTableItems.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const displayPage = Math.min(currentPage, totalPages);
@@ -154,109 +142,108 @@ export default function DataTable({
 
   const renderSortIndicator = (field: SortField) => {
     if (sortField !== field) {
-      return <ArrowUpDown size={12} className="text-zinc-600 group-hover:text-zinc-400 transition-all ml-1.5" />;
+      return <ArrowUpDown size={12} className="text-gray-300 group-hover:text-gray-400 transition-all ml-1.5" />;
     }
     return sortDirection === 'asc' 
-      ? <ChevronUp size={12} className="text-[#2DD4BF] ml-1.5 font-bold" />
-      : <ChevronDown size={12} className="text-[#2DD4BF] ml-1.5 font-bold" />;
+      ? <ChevronUp size={12} className="text-indigo-600 ml-1.5" />
+      : <ChevronDown size={12} className="text-indigo-600 ml-1.5" />;
   };
 
   return (
-    <div className="bg-[#111827] border border-teal-900/40 rounded-xl overflow-hidden shadow-2xl flex flex-col justify-between" id="invoices-data-table-deck">
+    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm flex flex-col justify-between" id="invoices-data-table-deck">
       <div className="min-w-full overflow-x-auto">
         <table className="w-full text-left border-collapse" role="table">
           <thead>
-            <tr className="border-b border-[#1F2D45] bg-[#0A0F1E]/80 text-[#94A3B8] text-[10px] uppercase font-bold tracking-wider font-mono">
+            <tr className="bg-gray-50 border-b border-gray-100 text-gray-400 text-[10px] uppercase font-semibold tracking-widest font-mono">
               <th 
-                className="py-4 px-6 cursor-pointer group hover:text-white transition-all select-none"
+                className="py-3 px-4 cursor-pointer group hover:text-gray-600 transition-all select-none"
                 onClick={() => handleSort('invoice_number')}
               >
-                <div className="flex items-center font-bold">
+                <div className="flex items-center">
                   <span>Invoice #</span>
                   {renderSortIndicator('invoice_number')}
                 </div>
               </th>
               
               <th 
-                className="py-4 px-3 cursor-pointer group hover:text-white transition-all select-none"
+                className="py-3 px-4 cursor-pointer group hover:text-gray-600 transition-all select-none"
                 onClick={() => handleSort('carrier_name')}
               >
-                <div className="flex items-center font-bold">
-                  <span>Carrier Name</span>
+                <div className="flex items-center">
+                  <span>Carrier</span>
                   {renderSortIndicator('carrier_name')}
                 </div>
               </th>
 
               <th 
-                className="py-4 px-3 cursor-pointer group hover:text-white transition-all select-none"
+                className="py-3 px-4 cursor-pointer group hover:text-gray-600 transition-all select-none"
                 onClick={() => handleSort('uploaded_at')}
               >
-                <div className="flex items-center font-bold">
+                <div className="flex items-center">
                   <span>Upload Date</span>
                   {renderSortIndicator('uploaded_at')}
                 </div>
               </th>
 
-              <th className="py-4 px-3 text-[#94A3B8] font-bold">
-                Source Document
+              <th className="py-3 px-4 text-gray-400 font-semibold">
+                Source
               </th>
 
               <th 
-                className="py-4 px-3 cursor-pointer group hover:text-white transition-all select-none text-right"
+                className="py-3 px-4 cursor-pointer group hover:text-gray-600 transition-all select-none text-right"
                 onClick={() => handleSort('total_billed')}
               >
-                <div className="flex items-center justify-end font-bold">
+                <div className="flex items-center justify-end">
                   <span>Total Billed</span>
                   {renderSortIndicator('total_billed')}
                 </div>
               </th>
 
               <th 
-                className="py-4 px-3 cursor-pointer group hover:text-white transition-all select-none text-right"
+                className="py-3 px-4 cursor-pointer group hover:text-gray-600 transition-all select-none text-right"
                 onClick={() => handleSort('total_savings')}
               >
-                <div className="flex items-center justify-end font-bold font-mono">
+                <div className="flex items-center justify-end">
                   <span>Discrepancy</span>
                   {renderSortIndicator('total_savings')}
                 </div>
               </th>
 
               <th 
-                className="py-4 px-3 cursor-pointer group hover:text-white transition-all select-none text-center"
+                className="py-3 px-4 cursor-pointer group hover:text-gray-600 transition-all select-none text-center"
                 onClick={() => handleSort('status')}
               >
-                <div className="flex items-center justify-center font-bold">
+                <div className="flex items-center justify-center">
                   <span>Status</span>
                   {renderSortIndicator('status')}
                 </div>
               </th>
 
-              <th className="py-4 px-6 text-right font-black">Actions</th>
+              <th className="py-3 px-4 text-right font-semibold">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#1F2D45]/30">
+          <tbody className="divide-y divide-gray-50">
             {loading ? (
               [1, 2, 3, 4, 5].map((idx) => (
                 <tr key={idx} className="animate-pulse">
-                  <td className="py-4 px-6"><div className="h-4 bg-[#1C2537] rounded w-24"></div></td>
-                  <td className="py-4 px-3"><div className="h-4 bg-[#1C2537] rounded w-28"></div></td>
-                  <td className="py-4 px-3"><div className="h-4 bg-[#1C2537] rounded w-20"></div></td>
-                  <td className="py-4 px-3"><div className="h-4 bg-[#1C2537] rounded w-28"></div></td>
-                  <td className="py-4 px-3 text-right"><div className="h-4 bg-[#1C2537] rounded w-16 ml-auto"></div></td>
-                  <td className="py-4 px-3 text-right"><div className="h-4 bg-[#1C2537] rounded w-16 ml-auto"></div></td>
-                  <td className="py-4 px-3 text-center"><div className="h-5 bg-[#1C2537] rounded-full w-20 mx-auto"></div></td>
-                  <td className="py-4 px-6 text-right"><div className="h-7 bg-[#1C2537] rounded w-16 ml-auto"></div></td>
+                  <td className="py-3 px-4"><div className="h-4 bg-gray-100 rounded w-24"></div></td>
+                  <td className="py-3 px-4"><div className="h-4 bg-gray-100 rounded w-28"></div></td>
+                  <td className="py-3 px-4"><div className="h-4 bg-gray-100 rounded w-20"></div></td>
+                  <td className="py-3 px-4"><div className="h-4 bg-gray-100 rounded w-28"></div></td>
+                  <td className="py-3 px-4 text-right"><div className="h-4 bg-gray-100 rounded w-16 ml-auto"></div></td>
+                  <td className="py-3 px-4 text-right"><div className="h-4 bg-gray-100 rounded w-16 ml-auto"></div></td>
+                  <td className="py-3 px-4 text-center"><div className="h-5 bg-gray-100 rounded-full w-20 mx-auto"></div></td>
+                  <td className="py-3 px-4 text-right"><div className="h-7 bg-gray-100 rounded w-16 ml-auto"></div></td>
                 </tr>
               ))
             ) : paginatedItems.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-xs text-[#94A3B8] font-mono leading-normal">
-                  No freight audit sheets found matching filter options.
+                <td colSpan={8} className="py-12 text-center text-sm text-gray-400">
+                  No invoices found matching filter options.
                 </td>
               </tr>
             ) : (
               paginatedItems.map((item, index) => {
-                // RENDER 1: Batch header row
                 if (item.type === 'batch_header') {
                   const bId = item.batchId!;
                   const isCollapsed = expandedBatches[bId] === false;
@@ -268,119 +255,112 @@ export default function DataTable({
                     <tr 
                       key={`header-${bId}`} 
                       onClick={(e) => toggleBatch(bId, e)}
-                      className="group bg-[#152033] hover:bg-[#1C2D47] text-white text-xs cursor-pointer transition-colors border-b border-[#1F2D45] select-none font-sans"
+                      className="bg-gray-50 hover:bg-gray-100 text-gray-900 text-sm cursor-pointer transition-colors border-b border-gray-100 select-none"
                     >
-                      <td colSpan={4} className="py-4 px-6 font-semibold">
+                      <td colSpan={4} className="py-3 px-4 font-semibold">
                         <div className="flex items-center gap-3">
-                          <span className="p-1 rounded bg-teal-500/10 text-[#2DD4BF] hover:scale-105 transition-all">
+                          <span className="p-0.5 rounded text-indigo-600">
                             {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                           </span>
-                          <Folder size={14} className="text-teal-400 shrink-0" />
-                          <span className="font-extrabold tracking-tight font-display text-xs text-white uppercase group-hover:text-teal-300">
+                          <Folder size={14} className="text-indigo-500 shrink-0" />
+                          <span className="font-semibold text-gray-900 text-sm">
                             {item.batchFilename}
                           </span>
-                          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[9px] text-[#94A3B8] font-mono uppercase font-black tracking-wide border border-slate-700/60 shrink-0">
+                          <span className="px-2 py-0.5 rounded-full bg-gray-200 text-[10px] text-gray-500 font-mono font-semibold">
                             {totalCount} Invoices
                           </span>
                         </div>
                       </td>
 
-                      {/* Aggregate totals columns for batch rows */}
-                      <td className="py-4 px-3 text-right font-mono font-extrabold text-[#2DD4BF]">
+                      <td className="py-3 px-4 text-right font-mono font-semibold text-gray-900">
                         {totalBilledVal.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                       </td>
-                      <td className="py-4 px-3 text-right font-mono font-extrabold text-[#EF4444]">
+                      <td className="py-3 px-4 text-right font-mono font-semibold text-red-500">
                         {totalSavingsVal > 0 ? totalSavingsVal.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '-'}
                       </td>
-                      <td className="py-4 px-3 text-center">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[9px] font-bold font-mono uppercase tracking-widest border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
-                          Batch Package
+                      <td className="py-3 px-4 text-center">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-semibold font-mono border border-indigo-200">
+                          Batch
                         </span>
                       </td>
-                      <td className="py-4 px-6 text-right">
-                        <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono font-bold">
-                          {isCollapsed ? 'Expand Bulk' : 'Collapse Bulk'}
+                      <td className="py-3 px-4 text-right">
+                        <span className="text-xs text-gray-400 font-mono">
+                          {isCollapsed ? 'Expand' : 'Collapse'}
                         </span>
                       </td>
                     </tr>
                   );
                 }
 
-                // If this is a child invoice under a collapsed batch header row, do not render it!
                 if (item.type === 'batch_child' && item.batchId && expandedBatches[item.batchId] === false) {
                   return null;
                 }
 
-                // RENDER 2: Single invoice row OR Child invoice row
                 const invoice = item.invoice!;
                 const isChild = item.type === 'batch_child';
+
+                let rowBg = 'hover:bg-gray-50';
+                if (invoice.status === 'flagged') rowBg = 'bg-amber-50/40 hover:bg-amber-50';
+                else if (invoice.status === 'approved') rowBg = 'bg-green-50/40 hover:bg-green-50';
+                else if (invoice.status === 'disputed') rowBg = 'bg-red-50/40 hover:bg-red-50';
 
                 return (
                   <tr 
                     key={invoice.id} 
                     onClick={() => handleRowClick(invoice.id)}
-                    className={`group text-xs text-[#F1F5F9] cursor-pointer transition-colors hover:bg-[#1C2537] ${
+                    className={`group text-sm text-gray-900 cursor-pointer transition-colors ${rowBg} ${
                       isChild 
-                        ? 'bg-[#0E1524]/60 border-l-2 border-teal-500/40' 
-                        : (index % 2 === 1 ? 'bg-[#0f1624]' : 'bg-transparent')
+                        ? 'border-l-2 border-indigo-300 bg-indigo-50/20' 
+                        : ''
                     }`}
                   >
-                    {/* Invoice ID/Number column */}
-                    <td className={`py-4 px-6 font-mono font-bold text-white group-hover:text-[#2DD4BF] transition-all duration-300 ${isChild ? 'pl-11' : ''}`}>
+                    <td className={`py-3 px-4 font-mono font-medium text-indigo-600 hover:underline ${isChild ? 'pl-10' : ''}`}>
                       <div className="flex items-center gap-2">
                         {isChild && (
-                          <span className="text-teal-500 shrink-0 select-none">↳</span>
+                          <span className="text-indigo-400 shrink-0 select-none">↳</span>
                         )}
                         <span>{invoice.invoice_number}</span>
                       </div>
                     </td>
 
-                    {/* Carrier name */}
-                    <td className="py-4 px-3 font-semibold text-zinc-300">
+                    <td className="py-3 px-4 font-medium text-gray-900">
                       {invoice.carrier_name}
                     </td>
 
-                    {/* Upload date */}
-                    <td className="py-4 px-3 text-[#94A3B8] font-mono text-[11px]">
+                    <td className="py-3 px-4 text-gray-400 font-mono text-xs">
                       {invoice.uploaded_at ? new Date(invoice.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
                     </td>
 
-                    {/* Source file name column */}
-                    <td className="py-4 px-3 text-[#94A3B8] text-[10px] font-mono max-w-[140px] truncate leading-normal italic">
+                    <td className="py-3 px-4 text-gray-400 text-xs font-mono max-w-[140px] truncate">
                       {isChild ? (
-                        <span className="text-teal-400 font-extrabold capitalize">Batch Sub-PDF</span>
+                        <span className="text-indigo-500 font-semibold">Batch Sub-PDF</span>
                       ) : (
                         invoice.source || 'Single Upload'
                       )}
                     </td>
 
-                    {/* Total billed price */}
-                    <td className="py-4 px-3 text-right font-mono font-bold text-white">
+                    <td className="py-3 px-4 text-right font-mono font-medium text-gray-900">
                       {invoice.total_billed.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                     </td>
 
-                    {/* Discrepancy savings */}
-                    <td className="py-4 px-3 text-right font-mono">
+                    <td className="py-3 px-4 text-right font-mono">
                       {invoice.total_savings > 0 ? (
-                        <span className="text-[#EF4444] font-black">
+                        <span className="text-red-500 font-semibold">
                           {invoice.total_savings.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                         </span>
                       ) : (
-                        <span className="text-[#475569] font-medium">-</span>
+                        <span className="text-gray-300">—</span>
                       )}
                     </td>
 
-                    {/* Status badge */}
-                    <td className="py-4 px-3 text-center">
+                    <td className="py-3 px-4 text-center">
                       <InvoiceStatusBadge status={invoice.status} />
                     </td>
 
-                    {/* Detail panel triggers */}
-                    <td className="py-4 px-6 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleRowClick(invoice.id)}
-                        className="inline-flex items-center gap-1.5 py-1 px-3 bg-[#1C2537] hover:bg-[#2DD4BF] hover:text-black border border-[#1F2D45] text-[#2DD4BF] rounded-lg text-[10px] uppercase font-bold font-mono tracking-wider transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
-                        id={`view-action-${invoice.id}`}
+                        className="inline-flex items-center gap-1 py-1 px-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 hover:text-gray-900 rounded-lg text-xs font-medium transition-all cursor-pointer"
                       >
                         <Eye size={11} />
                         <span>View</span>
@@ -394,34 +374,33 @@ export default function DataTable({
         </table>
       </div>
 
-      {/* Pagination control bar */}
       {totalPages > 1 && (
         <div 
-          className="border-t border-[#1F2D45] bg-[#0A0F1E]/50 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4"
+          className="border-t border-gray-100 bg-gray-50 px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-4"
           id="table-pagination-nav"
         >
-          <span className="text-[11px] font-mono text-[#94A3B8]">
-            Showing <strong className="text-white font-semibold">{startOffset}</strong> to{' '}
-            <strong className="text-white font-semibold">{endOffset}</strong> of{' '}
-            <strong className="text-white font-semibold">{totalItems}</strong> lines
+          <span className="text-xs font-mono text-gray-500">
+            Showing <strong className="text-gray-900 font-semibold">{startOffset}</strong> to{' '}
+            <strong className="text-gray-900 font-semibold">{endOffset}</strong> of{' '}
+            <strong className="text-gray-900 font-semibold">{totalItems}</strong>
           </span>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={displayPage === 1}
-              className="px-4 py-1.5 bg-[#1C2537] hover:bg-[#2DD4BF] hover:text-black hover:border-transparent text-zinc-300 border border-[#1F2D45] rounded-lg text-xs font-mono font-bold tracking-wide uppercase disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 hover:border-gray-300 rounded-lg text-xs font-medium transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
               id="pagination-prev"
             >
               Prev
             </button>
-            <span className="text-xs font-semibold px-2 text-[#2DD4BF] font-mono">
+            <span className="text-xs font-semibold px-2 text-gray-500 font-mono">
               Page {displayPage} of {totalPages}
             </span>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={displayPage === totalPages}
-              className="px-4 py-1.5 bg-[#1C2537] hover:bg-[#2DD4BF] hover:text-black hover:border-transparent text-zinc-300 border border-[#1F2D45] rounded-lg text-xs font-mono font-bold tracking-wide uppercase disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 hover:border-gray-300 rounded-lg text-xs font-medium transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
               id="pagination-next"
             >
               Next

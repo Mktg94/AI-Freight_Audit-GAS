@@ -14,7 +14,7 @@ export default function LoadingSpinner({ size = 'md' }: LoadingSpinnerProps) {
   return (
     <div className="flex items-center justify-center p-4" id="shared-loading-spinner" role="presentation">
       <div 
-        className={`${sizeClasses[size]} rounded-full border-[#2DD4BF] border-t-transparent animate-spin shadow-[0_0_15px_rgba(45,212,191,0.15)]`}
+        className={`${sizeClasses[size]} rounded-full border-indigo-600/30 border-t-indigo-600 animate-spin`}
         role="status"
         aria-label="Loading audit registers"
       />

@@ -2,14 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Menu, Bell, Shield, Sparkles, Check } from 'lucide-react';
+import { Menu, Bell, Check, Shield } from 'lucide-react';
 
 export default function TopBar() {
   const [initials, setInitials] = useState('AA');
   const [showNotifications, setShowNotifications] = useState(false);
   const [hasNotifications, setHasNotifications] = useState(true);
 
-  // Load name initials from auth session state or fallback cache
   useEffect(() => {
     const getInitials = (nameStr: string) => {
       const parts = nameStr.trim().split(/\s+/);
@@ -37,7 +36,7 @@ export default function TopBar() {
         try {
           const parsed = JSON.parse(cached);
           if (parsed?.user) {
-            const name = parsed.user.user_metadata?.full_name || parsed.user.email || 'Atlas Admin';
+            const name = parsed.user.user_metadata?.full_name || parsed.user.email || 'Admin';
             setInitials(getInitials(name));
           }
         } catch (e) {}
@@ -46,7 +45,6 @@ export default function TopBar() {
   }, []);
 
   const triggerMobileMenu = () => {
-    // Dispatch custom event to reactive Sidebar component 
     const event = new CustomEvent('toggle-sidebar');
     window.dispatchEvent(event);
   };
@@ -59,58 +57,56 @@ export default function TopBar() {
   return (
     <header 
       id="workspace-top-navigation-bar"
-      className="bg-[var(--bg-surface)] border-b border-[var(--border-color)] h-16 flex items-center justify-between px-6 sticky top-0 z-30"
+      className="bg-white border-b border-gray-100 h-14 flex items-center justify-between px-6 sticky top-0 z-30"
     >
       
-      {/* Left: Mobile hamburger menu toggle */}
+      {/* Left: Mobile hamburger + status */}
       <div className="flex items-center gap-4">
         <button
           onClick={triggerMobileMenu}
-          className="md:hidden text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] transition-colors focus:outline-none"
+          className="md:hidden text-gray-600 hover:text-gray-900 p-1.5 rounded-lg border border-gray-200 bg-white transition-colors focus:outline-none cursor-pointer"
           aria-label="Toggle Navigation drawer"
         >
           <Menu size={18} />
         </button>
         
-        {/* Page status or sub-heading (hidden on narrow screens) */}
-        <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] font-mono selection-transparent uppercase tracking-wider">
-          <Shield size={12} className="text-[var(--accent-color)]" />
-          <span>Audit Engine Active & Encrypted</span>
+        <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-gray-400 font-mono uppercase tracking-wider">
+          <Shield size={12} className="text-indigo-500" />
+          <span>Audit Engine Active</span>
         </div>
       </div>
 
-      {/* Right: Notification Alerts + Initials Avatar */}
+      {/* Right: Notifications + Avatar */}
       <div className="flex items-center gap-4 relative">
         
-        {/* Notification Bell with alert dot indicator */}
+        {/* Notification Bell */}
         <div className="relative">
           <button
             onClick={() => {
               setShowNotifications(!showNotifications);
-              setHasNotifications(false); // cleared on click
+              setHasNotifications(false);
             }}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-2 hover:bg-[var(--bg-elevated)] rounded-lg transition-colors relative cursor-pointer"
-            title="System Alert Reports"
+            className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-50 rounded-lg transition-colors relative cursor-pointer"
+            title="Notifications"
           >
             <Bell size={16} />
             {hasNotifications && (
-              <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 bg-[var(--danger-color)] rounded-full animate-pulse" />
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />
             )}
           </button>
 
-          {/* Quick Notification Drops Popover */}
           {showNotifications && (
-            <div className="absolute right-0 mt-2.5 w-72 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl p-4 shadow-xl z-50 space-y-3">
-              <div className="flex justify-between items-center pb-2 border-b border-[var(--border-color)]">
-                <span className="text-[10px] uppercase font-black text-[var(--text-primary)] px-0.5 tracking-wider">Carrier Billing Alerts</span>
-                <span className="text-[9px] text-[var(--accent-color)] font-semibold flex items-center gap-0.5"><Check size={8} /> Sync Active</span>
+            <div className="absolute right-0 mt-2.5 w-72 bg-white border border-gray-100 rounded-xl p-4 shadow-lg z-50 space-y-3">
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                <span className="text-[10px] uppercase font-bold text-gray-900 tracking-wider">Carrier Billing Alerts</span>
+                <span className="text-[9px] text-indigo-600 font-semibold flex items-center gap-0.5"><Check size={8} /> Sync Active</span>
               </div>
               
               <div className="space-y-3.5 max-h-48 overflow-y-auto">
                 {notificationList.map((notif) => (
                   <div key={notif.id} className="text-[11px] leading-relaxed text-left">
-                     <p className="text-[var(--text-primary)]">{notif.text}</p>
-                     <span className="text-[9px] text-[var(--text-muted)] font-mono mt-0.5 block">{notif.time}</span>
+                     <p className="text-gray-700">{notif.text}</p>
+                     <span className="text-[9px] text-gray-400 font-mono mt-0.5 block">{notif.time}</span>
                   </div>
                 ))}
               </div>
@@ -118,16 +114,12 @@ export default function TopBar() {
           )}
         </div>
 
-        {/* Vertical divider line */}
-        <span className="h-4 w-px bg-[var(--border-color)]" />
+        {/* Divider */}
+        <span className="w-px h-5 bg-gray-200" />
 
-        {/* User initials circle avatar container */}
-        <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-color)] flex items-center justify-center select-none cursor-pointer hover:bg-[var(--bg-surface)] transition-colors">
-            <span className="text-[10px] font-bold text-[var(--accent-color)] font-sans tracking-tight">
-              {initials}
-            </span>
-          </div>
+        {/* User avatar initials */}
+        <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 text-xs font-semibold font-mono flex items-center justify-center select-none">
+          {initials}
         </div>
 
       </div>

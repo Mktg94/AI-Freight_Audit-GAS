@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import { Contract } from '@/types';
 import { 
-  FileSignature, Landmark, Percent, Settings, Plus, X, 
-  ArrowLeft, Save, HelpCircle, DollarSign, ListPlus, Flame, ShieldAlert
+  FileSignature, Plus, X, 
+  ArrowLeft, Save, ShieldAlert
 } from 'lucide-react';
 
 interface CustomRuleItem {
@@ -21,17 +21,14 @@ interface ContractFormProps {
 export default function ContractForm({ contract, onSuccess }: ContractFormProps) {
   const isEditing = !!contract;
 
-  // Form states Section 1 — Carrier Info
   const [carrierName, setCarrierName] = useState(contract?.carrier_name || '');
   const [effectiveDate, setEffectiveDate] = useState(contract?.effective_date || '2026-06-01');
   const [expiryDate, setExpiryDate] = useState(contract?.expiry_date || '2027-06-01');
 
-  // Form states Section 2 — Base Rates
   const [baseRateLb, setBaseRateLb] = useState((contract?.base_rate_per_lb ?? 0.12).toString());
   const [baseRateMile, setBaseRateMile] = useState((contract?.base_rate_per_mile ?? 1.50).toString());
   const [minimumCharge, setMinimumCharge] = useState((contract?.minimum_charge ?? 120.00).toString());
 
-  // Form states Section 3 — Accessorial Charges
   const [fuelPct, setFuelPct] = useState(((contract?.fuel_surcharge_pct ?? 0.14) * 100).toString());
   const [residentialSurcharge, setResidentialSurcharge] = useState((contract?.residential_surcharge ?? 75.00).toString());
   const [liftgateFee, setLiftgateFee] = useState((contract?.liftgate_fee ?? 65.00).toString());
@@ -39,13 +36,11 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
   const [insideDeliveryFee, setInsideDeliveryFee] = useState((contract?.inside_delivery_fee ?? 90.00).toString());
   const [redeliveryFee, setRedeliveryFee] = useState((contract?.redelivery_fee ?? 50.00).toString());
 
-  // Form states Section 4 — Custom Rules
   const initialRules: CustomRuleItem[] = (() => {
     if (contract?.custom_rules) {
       if (Array.isArray(contract.custom_rules)) {
         return contract.custom_rules as CustomRuleItem[];
       } else {
-        // convert from object format if necessary
         return Object.entries(contract.custom_rules).map(([key, value]) => ({
           name: key.replace(/_/g, ' '),
           value: String(value),
@@ -62,7 +57,6 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  // Field triggers
   const handleAddRule = () => {
     setCustomRules(prev => [...prev, { name: '', value: '', type: 'Fixed Fee' }]);
   };
@@ -75,14 +69,12 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
     setCustomRules(prev => prev.map((item, i) => i === index ? { ...item, ...fields } : item));
   };
 
-  // Safe navigation back
   const handleBackToContracts = (e: React.MouseEvent) => {
     e.preventDefault();
     window.history.pushState({}, '', '/contracts');
     window.dispatchEvent(new Event('popstate'));
   };
 
-  // Submit Handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!carrierName.trim()) {
@@ -93,7 +85,6 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
     setIsSubmitting(true);
     setErrorText(null);
 
-    // Build Payload Object
     const payload = {
       carrier_name: carrierName,
       effective_date: effectiveDate,
@@ -116,28 +107,23 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
 
       const response = await fetch(endpoint, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        throw new Error(await response.text() || "Failed to preserve contract ledger rates");
+        throw new Error(await response.text() || "Failed to save contract");
       }
 
       const result = await response.json();
       
-      // Update global SPA state if callback exists or trigger navigation
-      // Using custom trigger events to notify App.tsx of state modifications natively!
       const customEventName = isEditing ? 'contracts-updated' : 'contracts-created';
       window.dispatchEvent(new CustomEvent(customEventName, { detail: result.data || { ...payload, id: contract?.id || `contract-${Date.now()}` } }));
 
-      // Success feedback toast setup
       const successToast = new CustomEvent('show-toast', {
         detail: {
-          title: "Contract Saved Successfully",
-          message: `Negotiated audit policies for '${carrierName}' have been archived securely.`
+          title: "Contract Saved",
+          message: `Policies for '${carrierName}' archived.`
         }
       });
       window.dispatchEvent(successToast);
@@ -149,25 +135,13 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
         window.dispatchEvent(new Event('popstate'));
       }
     } catch (err: any) {
-      console.warn("API write issue, performing fallback local write:", err);
-      // Fallback sandbox write directly so user experiences a working mock flows!
-      const mockResult = {
-        ...payload,
-        id: contract?.id || `contract-mock-${Math.random().toString(36).substr(2, 9)}`,
-        created_at: contract?.created_at || new Date().toISOString()
-      };
-
-      const customEventName = isEditing ? 'contracts-updated' : 'contracts-created';
-      window.dispatchEvent(new CustomEvent(customEventName, { detail: mockResult }));
-
-      // Success feedback toast setup
-      const successToast = new CustomEvent('show-toast', {
+      console.error("Failed to save contract:", err);
+      window.dispatchEvent(new CustomEvent('show-toast', {
         detail: {
-          title: "Contract Cached",
-          message: `Policy cached locally in Sandbox memory for ${carrierName}.`
+          title: "Save Failed",
+          message: err.message || "Could not save contract."
         }
-      });
-      window.dispatchEvent(successToast);
+      }));
 
       if (onSuccess) {
         onSuccess();
@@ -180,306 +154,276 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
     }
   };
 
+  const inputClass = "w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all";
+  const labelClass = "block text-sm font-medium text-gray-700 mb-1.5";
+  const sectionHeaderClass = "flex items-center gap-2 pb-3 border-b border-gray-50 mb-4";
+  const accentBarClass = "w-1 h-4 bg-indigo-500 rounded-full";
+
   return (
-    <div className="bg-[#111827] border border-teal-900/40 rounded-xl p-6 md:p-8 space-y-6 animate-fade-in max-w-4xl mx-auto" id="contract-builder-form">
+    <div className="max-w-2xl mx-auto bg-white border border-gray-100 rounded-2xl shadow-sm p-8 space-y-6 animate-fade-in" id="contract-builder-form">
       
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-[#1F2D45]">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleBackToContracts}
-            className="p-2 bg-[#1C2537] hover:bg-teal-950/20 text-[#2DD4BF] border border-[#1F2D45] rounded-lg transition-all cursor-pointer"
-            title="Go Back"
-          >
-            <ArrowLeft size={16} />
-          </button>
-          <div>
-            <h2 className="text-xl font-black text-white font-display uppercase tracking-tight">
-              {isEditing ? 'Modify Carrier Agreement' : 'Register Carrier Agreement'}
-            </h2>
-            <p className="text-xs text-[#94A3B8]">
-              Formulate negotiated rates, surcharge grids, and dynamic accessorial validation policies.
-            </p>
-          </div>
+      <div className="flex items-center gap-3 pb-4 border-b border-gray-50">
+        <button
+          onClick={handleBackToContracts}
+          className="p-2 bg-white hover:bg-gray-50 text-gray-500 border border-gray-200 rounded-lg transition-all cursor-pointer"
+          title="Go Back"
+        >
+          <ArrowLeft size={16} />
+        </button>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">
+            {isEditing ? 'Edit Carrier Agreement' : 'New Carrier Agreement'}
+          </h2>
+          <p className="text-sm text-gray-500">
+            Define negotiated rates and surcharge terms.
+          </p>
         </div>
       </div>
 
       {errorText && (
-        <div className="bg-red-500/10 border border-red-500/30 text-[#EF4444] rounded-xl p-4 text-xs font-semibold flex items-center gap-3">
+        <div className="bg-red-50 border border-red-100 text-red-600 rounded-xl p-4 text-sm flex items-center gap-3">
           <ShieldAlert size={16} />
           <span>{errorText}</span>
         </div>
       )}
 
-      {/* Main Entry Form */}
       <form onSubmit={handleSubmit} className="space-y-8">
         
-        {/* SECTION 1 — CARRIER INFO */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-[#1F2D45]/60 pb-1.5">
-            <span className="p-1 px-1.5 rounded bg-teal-500/10 text-[#2DD4BF] font-mono text-[9px] font-bold">SEC &bull; 01</span>
-            <h3 className="text-xs font-bold text-[#2DD4BF] uppercase tracking-wider font-mono">Carrier Profile Info</h3>
+        <section>
+          <div className={sectionHeaderClass}>
+            <div className={accentBarClass} />
+            <h3 className="text-sm font-semibold text-gray-900">Carrier Info</h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-1">
-              <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider mb-2 font-mono">Carrier/Logistics Name</label>
+              <label className={labelClass}>Carrier Name</label>
               <input
                 type="text"
                 required
                 value={carrierName}
                 onChange={(e) => setCarrierName(e.target.value)}
-                placeholder="e.g. UPS Freight, FedEx, XPO Logistics"
-                className="w-full px-3 py-2 bg-[#0A0F1E] border border-[#1F2D45] rounded-lg text-white font-bold text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
+                placeholder="e.g. UPS Freight"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider mb-2 font-mono">Effective Term Start</label>
+              <label className={labelClass}>Effective Date</label>
               <input
                 type="date"
                 required
                 value={effectiveDate}
                 onChange={(e) => setEffectiveDate(e.target.value)}
-                className="w-full px-3 py-2 bg-[#0A0F1E] border border-[#1F2D45] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider mb-2 font-mono">Effective Term End</label>
+              <label className={labelClass}>Expiry Date</label>
               <input
                 type="date"
                 required
                 value={expiryDate}
                 onChange={(e) => setExpiryDate(e.target.value)}
-                className="w-full px-3 py-2 bg-[#0A0F1E] border border-[#1F2D45] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
+                className={inputClass}
               />
             </div>
           </div>
         </section>
 
-        {/* SECTION 2 — BASE RATES */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-[#1F2D45]/60 pb-1.5">
-            <span className="p-1 px-1.5 rounded bg-teal-500/10 text-[#2DD4BF] font-mono text-[9px] font-bold">SEC &bull; 02</span>
-            <h3 className="text-xs font-bold text-[#2DD4BF] uppercase tracking-wider font-mono">Base Rating Schedule</h3>
+        <section>
+          <div className={sectionHeaderClass}>
+            <div className={accentBarClass} />
+            <h3 className="text-sm font-semibold text-gray-900">Base Rates</h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider mb-2 font-mono">Base Rate per LB ($)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-zinc-500 text-xs font-bold font-mono">$</span>
-                <input
-                  type="number"
-                  step="0.0001"
-                  required
-                  value={baseRateLb}
-                  onChange={(e) => setBaseRateLb(e.target.value)}
-                  className="w-full pl-7 pr-3 py-2 bg-[#0A0F1E] border border-[#1F2D45] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
-                />
-              </div>
+              <label className={labelClass}>Base Rate per LB ($)</label>
+              <input
+                type="number"
+                step="0.0001"
+                required
+                value={baseRateLb}
+                onChange={(e) => setBaseRateLb(e.target.value)}
+                className={inputClass}
+              />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider mb-2 font-mono">Base Rate per Mile ($)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-zinc-500 text-xs font-bold font-mono">$</span>
-                <input
-                  type="number"
-                  step="0.0001"
-                  required
-                  value={baseRateMile}
-                  onChange={(e) => setBaseRateMile(e.target.value)}
-                  className="w-full pl-7 pr-3 py-2 bg-[#0A0F1E] border border-[#1F2D45] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
-                />
-              </div>
+              <label className={labelClass}>Base Rate per Mile ($)</label>
+              <input
+                type="number"
+                step="0.0001"
+                required
+                value={baseRateMile}
+                onChange={(e) => setBaseRateMile(e.target.value)}
+                className={inputClass}
+              />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider mb-2 font-mono">Minimum Charge Limit ($)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-zinc-500 text-xs font-bold font-mono">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={minimumCharge}
-                  onChange={(e) => setMinimumCharge(e.target.value)}
-                  className="w-full pl-7 pr-3 py-2 bg-[#0A0F1E] border border-[#1F2D45] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
-                />
-              </div>
+              <label className={labelClass}>Minimum Charge ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                value={minimumCharge}
+                onChange={(e) => setMinimumCharge(e.target.value)}
+                className={inputClass}
+              />
             </div>
           </div>
         </section>
 
-        {/* SECTION 3 — ACCESSORIAL CHARGES */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-[#1F2D45]/60 pb-1.5">
-            <span className="p-1 px-1.5 rounded bg-teal-500/10 text-[#2DD4BF] font-mono text-[9px] font-bold">SEC &bull; 03</span>
-            <h3 className="text-xs font-bold text-[#2DD4BF] uppercase tracking-wider font-mono">Accessorial & Surcharges</h3>
+        <section>
+          <div className={sectionHeaderClass}>
+            <div className={accentBarClass} />
+            <h3 className="text-sm font-semibold text-gray-900">Accessorial Charges</h3>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider mb-2 font-mono">Fuel Surcharge Limit (%)</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  step="0.1"
-                  required
-                  value={fuelPct}
-                  onChange={(e) => setFuelPct(e.target.value)}
-                  className="w-full pr-7 px-3 py-2 bg-[#0A0F1E] border border-[#1F2D45] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
-                />
-                <span className="absolute right-3 top-2 text-zinc-500 text-xs font-bold font-mono">%</span>
-              </div>
+              <label className={labelClass}>Fuel Surcharge (%)</label>
+              <input
+                type="number"
+                step="0.1"
+                required
+                value={fuelPct}
+                onChange={(e) => setFuelPct(e.target.value)}
+                className={inputClass}
+              />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider mb-2 font-mono">Residential Surcharge ($)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-zinc-500 text-xs font-bold font-mono">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={residentialSurcharge}
-                  onChange={(e) => setResidentialSurcharge(e.target.value)}
-                  className="w-full pl-7 pr-3 py-2 bg-[#0A0F1E] border border-[#1F2D45] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
-                />
-              </div>
+              <label className={labelClass}>Residential ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                value={residentialSurcharge}
+                onChange={(e) => setResidentialSurcharge(e.target.value)}
+                className={inputClass}
+              />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider mb-2 font-mono">Liftgate Accessory Fee ($)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-zinc-500 text-xs font-bold font-mono">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={liftgateFee}
-                  onChange={(e) => setLiftgateFee(e.target.value)}
-                  className="w-full pl-7 pr-3 py-2 bg-[#0A0F1E] border border-[#1F2D45] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
-                />
-              </div>
+              <label className={labelClass}>Liftgate Fee ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                value={liftgateFee}
+                onChange={(e) => setLiftgateFee(e.target.value)}
+                className={inputClass}
+              />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider mb-2 font-mono">Detention per Hour ($)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-zinc-500 text-xs font-bold font-mono">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={detentionRate}
-                  onChange={(e) => setDetentionRate(e.target.value)}
-                  className="w-full pl-7 pr-3 py-2 bg-[#0A0F1E] border border-[#1F2D45] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
-                />
-              </div>
+              <label className={labelClass}>Detention per Hour ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                value={detentionRate}
+                onChange={(e) => setDetentionRate(e.target.value)}
+                className={inputClass}
+              />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider mb-2 font-mono">Inside Delivery Surcharge ($)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-zinc-500 text-xs font-bold font-mono">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={insideDeliveryFee}
-                  onChange={(e) => setInsideDeliveryFee(e.target.value)}
-                  className="w-full pl-7 pr-3 py-2 bg-[#0A0F1E] border border-[#1F2D45] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
-                />
-              </div>
+              <label className={labelClass}>Inside Delivery ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                value={insideDeliveryFee}
+                onChange={(e) => setInsideDeliveryFee(e.target.value)}
+                className={inputClass}
+              />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider mb-2 font-mono">Redelivery Attempt Fee ($)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-zinc-500 text-xs font-bold font-mono">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={redeliveryFee}
-                  onChange={(e) => setRedeliveryFee(e.target.value)}
-                  className="w-full pl-7 pr-3 py-2 bg-[#0A0F1E] border border-[#1F2D45] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
-                />
-              </div>
+              <label className={labelClass}>Redelivery Fee ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                value={redeliveryFee}
+                onChange={(e) => setRedeliveryFee(e.target.value)}
+                className={inputClass}
+              />
             </div>
           </div>
         </section>
 
-        {/* SECTION 4 — CUSTOM RULES */}
-        <section className="space-y-4">
-          <div className="flex justify-between items-center border-b border-[#1F2D45]/60 pb-1.5 flex-wrap gap-2">
+        <section>
+          <div className="flex justify-between items-center pb-3 border-b border-gray-50 mb-4">
             <div className="flex items-center gap-2">
-              <span className="p-1 px-1.5 rounded bg-teal-500/10 text-[#2DD4BF] font-mono text-[9px] font-bold">SEC &bull; 04</span>
-              <h3 className="text-xs font-bold text-[#2DD4BF] uppercase tracking-wider font-mono">Dynamic Custom Audit Policies</h3>
+              <div className={accentBarClass} />
+              <h3 className="text-sm font-semibold text-gray-900">Custom Audit Policies</h3>
             </div>
             
             <button
               type="button"
               onClick={handleAddRule}
-              className="py-1 px-3 bg-teal-950/20 text-[#2DD4BF] border border-teal-500/20 hover:border-[#2DD4BF] rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+              className="border-2 border-dashed border-gray-200 hover:border-indigo-200 text-gray-500 hover:text-indigo-600 text-sm font-medium rounded-xl px-4 py-1.5 transition-colors duration-150 flex items-center gap-1 cursor-pointer"
             >
-              <Plus size={11} />
-              <span>Add Custom Rule</span>
+              <Plus size={12} />
+              <span>Add Rule</span>
             </button>
           </div>
 
           <div className="space-y-3">
             {customRules.length === 0 ? (
-              <div className="py-6 border border-dashed border-[#1F2D45] rounded-xl text-center text-zinc-500 text-[11px]">
-                No custom audit policies defined. Active rate sheet auditing defaults to standard accessorial logic.
+              <div className="py-6 border border-dashed border-gray-200 rounded-xl text-center text-sm text-gray-400">
+                No custom rules defined.
               </div>
             ) : (
               customRules.map((rule, index) => (
-                <div key={index} className="flex gap-3 items-center flex-wrap md:flex-nowrap bg-[#0A0F1E]/60 border border-[#1F2D45] rounded-xl p-3 animate-fade-in">
+                <div key={index} className="flex gap-3 items-center flex-wrap md:flex-nowrap bg-gray-50 rounded-xl p-3 border border-gray-100">
                   <div className="flex-1 min-w-[150px]">
-                    <span className="block text-[8px] font-bold text-zinc-500 uppercase tracking-widest font-mono mb-1">RULE NAME / EVENT</span>
+                    <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">Rule Name</span>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Free Waiting Minutes, Liftgate Waiver"
+                      placeholder="e.g. Free Waiting Minutes"
                       value={rule.name}
                       onChange={(e) => handleUpdateRule(index, { name: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-[#111827] border border-[#1F2D45] rounded bg-transparent text-white font-medium text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all"
                     />
                   </div>
 
                   <div className="w-[120px] shrink-0">
-                    <span className="block text-[8px] font-bold text-zinc-500 uppercase tracking-widest font-mono mb-1">REQUIRED VALUE</span>
+                    <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">Value</span>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. 60, 0.0"
+                      placeholder="e.g. 60"
                       value={rule.value}
                       onChange={(e) => handleUpdateRule(index, { value: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-[#111827] border border-[#1F2D45] rounded bg-transparent text-white font-mono text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all"
                     />
                   </div>
 
                   <div className="w-[150px] shrink-0">
-                    <span className="block text-[8px] font-bold text-zinc-500 uppercase tracking-widest font-mono mb-1">AUDIT STRATEGY TYPE</span>
+                    <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">Type</span>
                     <select
                       value={rule.type}
                       onChange={(e) => handleUpdateRule(index, { type: e.target.value as any })}
-                      className="w-full px-3 py-1.5 bg-[#111827] border border-[#1F2D45] rounded bg-transparent text-[#2DD4BF] font-mono text-xs focus:outline-none focus:border-[#2DD4BF] transition-colors"
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all"
                     >
-                      <option value="Fixed Fee" className="bg-[#111827]">Fixed Fee</option>
-                      <option value="Percentage" className="bg-[#111827]">Percentage</option>
-                      <option value="Not Allowed" className="bg-[#111827]">Not Allowed</option>
+                      <option value="Fixed Fee">Fixed Fee</option>
+                      <option value="Percentage">Percentage</option>
+                      <option value="Not Allowed">Not Allowed</option>
                     </select>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => handleRemoveRule(index)}
-                    className="p-1 bg-red-500/10 hover:bg-red-500/20 text-[#EF4444] border border-red-500/20 rounded-lg shrink-0 self-end md:mt-0 mt-2 mb-0.5 cursor-pointer"
+                    className="p-1 text-gray-400 hover:text-red-500 shrink-0 self-end md:mt-0 mt-2 mb-0.5 cursor-pointer"
                   >
                     <X size={15} />
                   </button>
@@ -489,12 +433,11 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
           </div>
         </section>
 
-        {/* Submit Block */}
-        <div className="pt-6 border-t border-[#1F2D45] flex justify-end gap-3.5">
+        <div className="pt-6 border-t border-gray-50 flex justify-end gap-3">
           <button
             type="button"
             onClick={handleBackToContracts}
-            className="px-4.5 py-2.5 bg-[#1C2537] hover:bg-zinc-800 text-[#94A3B8] font-bold text-xs uppercase rounded-lg border border-[#1F2D45] transition-colors cursor-pointer"
+            className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 hover:border-gray-300 text-sm font-medium px-4 py-2 rounded-xl transition-colors cursor-pointer"
           >
             Cancel
           </button>
@@ -502,17 +445,17 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-6 py-2.5 bg-[#2DD4BF] hover:bg-[#14B8A4] text-black font-black text-xs uppercase rounded-lg transition-all shadow-[0_0_20px_rgba(45,212,191,0.2)] hover:shadow-[0_0_25px_rgba(45,212,191,0.35)] flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            className="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold text-sm px-4 py-2 rounded-xl transition-colors duration-150 flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {isSubmitting ? (
               <>
-                <div className="h-3 w-3 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                <span>Saving agreement policies...</span>
+                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Saving...</span>
               </>
             ) : (
               <>
                 <Save size={13} />
-                <span>Save Agreement Terms</span>
+                <span>Save Contract</span>
               </>
             )}
           </button>

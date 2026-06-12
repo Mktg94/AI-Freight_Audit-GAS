@@ -10,12 +10,11 @@ import InvoiceStatusBadge from '@/components/invoices/InvoiceStatusBadge';
 import LineItemTable from '@/components/invoices/LineItemTable';
 
 interface InvoiceDetailPageProps {
-  invoiceId?: string; // Sourced when running inside SPA client router
-  onBack?: () => void; // Navigates back inside SPA mode
+  invoiceId?: string;
+  onBack?: () => void;
 }
 
 export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPageProps) {
-  // Extract id from window pathname if props is omitted (for direct browser loads in SSR contexts)
   const resolvedId = invoiceId || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '');
   
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -56,7 +55,6 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
     fetchInvoiceData();
   }, [resolvedId]);
 
-  // Bulk action: approve clean non-discrepant items
   const handleApproveAllCleanItems = async () => {
     if (!resolvedId) return;
     setApprovingClean(true);
@@ -76,14 +74,12 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
 
       const result = await response.json();
       if (result.success) {
-        // Trigger refetch of updated document state and items
         await fetchInvoiceData();
 
-        // Broadcast a success status toast
         window.dispatchEvent(new CustomEvent('show-toast', {
           detail: {
             title: 'Auto-Approved Clean Rows',
-            message: `Successfully verified and approved ${result.approvedCount} items with zero contracts discrepancy.`
+            message: `Successfully verified and approved ${result.approvedCount} items with zero discrepancy.`
           }
         }));
       } else {
@@ -120,15 +116,13 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
 
       const result = await response.json();
       if (result.success && result.disputeId) {
-        // Broadcast success toast
         window.dispatchEvent(new CustomEvent('show-toast', {
           detail: {
             title: 'Dispute Letter Created',
-            message: `Dispute claim dossier has been successfully generated using Anthropic/Gemini AI.`
+            message: `Dispute claim dossier has been successfully generated using AI.`
           }
         }));
 
-        // Redirect to detail page
         if (typeof window !== 'undefined') {
           window.history.pushState({}, '', `/disputes/${result.disputeId}`);
           window.dispatchEvent(new Event('popstate'));
@@ -149,7 +143,6 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
     }
   };
 
-  // Navigates back safely
   const handleNavigateBack = (e: React.MouseEvent) => {
     e.preventDefault();
     if (onBack) {
@@ -160,7 +153,6 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
     }
   };
 
-  // Detect if there are any lingering 'pending' rows that have exactly discrepancy = 0
   const cleanPendingCount = lineItems.filter(
     item => item.status === 'pending' && item.discrepancy === 0
   ).length;
@@ -170,25 +162,25 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[450px] space-y-4" id="detail-page-loader">
-        <div className="h-10 w-10 border-4 border-[#2DD4BF] border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs uppercase font-mono tracking-widest text-[#2DD4BF]">Reassembling freight audit matrix...</span>
+        <div className="h-10 w-10 border-4 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin" />
+        <span className="text-xs uppercase font-mono tracking-widest text-indigo-600">Loading...</span>
       </div>
     );
   }
 
   if (errorMessage || !invoice) {
     return (
-      <div className="bg-[#111827] border border-red-950/40 rounded-xl p-8 text-center space-y-4 max-w-xl mx-auto my-12" id="detail-page-error">
-        <div className="p-3 bg-red-950/40 text-[#EF4444] border border-red-500/20 rounded-full inline-block">
+      <div className="bg-white border border-red-100 rounded-2xl p-8 text-center space-y-4 max-w-xl mx-auto my-12" id="detail-page-error">
+        <div className="p-3 bg-red-50 text-red-500 border border-red-100 rounded-full inline-block">
           <ShieldAlert size={32} />
         </div>
-        <h3 className="text-lg font-bold font-display text-white">Freight Audit Ledger Unresolved</h3>
-        <p className="text-xs text-[#94A3B8]">
-          {errorMessage || "The requested carrier invoice document could not be located in your cloud cluster."}
+        <h3 className="text-lg font-semibold text-gray-900">Unable to Load Invoice</h3>
+        <p className="text-sm text-gray-500">
+          {errorMessage || "The requested invoice could not be found."}
         </p>
         <button
           onClick={handleNavigateBack}
-          className="py-2 px-5 bg-[#1C2537] hover:bg-teal-950/30 text-[#2DD4BF] border border-[#1F2D45] rounded-xl text-xs uppercase font-semibold font-mono tracking-wider transition-all inline-flex items-center gap-2 cursor-pointer"
+          className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 hover:border-gray-300 text-sm font-medium px-4 py-2 rounded-xl transition-all inline-flex items-center gap-2 cursor-pointer"
         >
           <ArrowLeft size={14} />
           <span>Return to invoices</span>
@@ -198,41 +190,37 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
   }
 
   return (
-    <div className="space-y-8 animate-fade-in" id="invoice-detail-view-workspace">
+    <div className="space-y-6 animate-fade-in" id="invoice-detail-view-workspace">
       
-      {/* Header with back actions and breadcrumbs */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="space-y-2">
-          {/* Back button and breadcrumbs */}
           <div className="flex items-center gap-3">
             <button
               onClick={handleNavigateBack}
-              className="p-1 px-2.5 bg-[#111827] hover:bg-[#1C2537] border border-[#1F2D45] hover:border-[#2DD4BF]/40 text-[#94A3B8] hover:text-white rounded-lg transition-all flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
+              className="p-1 px-2.5 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 text-gray-500 hover:text-gray-700 rounded-lg transition-all flex items-center gap-1.5 text-sm font-medium cursor-pointer"
               id="back-to-invoices-nav"
             >
               <ArrowLeft size={14} />
               <span>Invoices</span>
             </button>
-            <span className="text-[#475569]/80 font-mono text-xs">/</span>
-            <span className="text-[#94A3B8] font-mono font-bold text-xs">#{invoice.invoice_number}</span>
+            <span className="text-gray-300 font-mono text-sm">/</span>
+            <span className="text-gray-500 font-mono font-semibold text-sm">#{invoice.invoice_number}</span>
           </div>
 
-          {/* Document Reference Title */}
-          <div className="flex flex-wrap items-center gap-3 mt-1.5">
-            <h1 className="text-xl md:text-2xl font-black text-white font-display tracking-tight">
+          <div className="flex flex-wrap items-center gap-3 mt-1">
+            <h1 className="text-xl font-semibold text-gray-900">
               Audit Review: Invoice #{invoice.invoice_number}
             </h1>
             <InvoiceStatusBadge status={invoice.status} />
           </div>
         </div>
 
-        {/* Dynamic Action Controls */}
         <div className="flex items-center gap-3 shrink-0">
           {hasCleanPendingItems && (
             <button
               onClick={handleApproveAllCleanItems}
               disabled={approvingClean}
-              className="py-2.5 px-4 bg-emerald-500/10 hover:bg-emerald-500 border border-emerald-500/30 hover:text-black text-[#10B981] font-bold font-mono rounded-lg text-xs uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              className="bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 text-sm font-medium px-4 py-2 rounded-xl transition-all inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
               id="bulk-approve-clean-action"
             >
               {approvingClean ? (
@@ -248,7 +236,7 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
             <button
               onClick={handleGenerateDisputeLetter}
               disabled={generatingDispute || invoice.status === 'disputed'}
-              className="py-2.5 px-4 bg-[#EF4444] hover:bg-red-500 border border-red-500/30 text-white font-black font-mono rounded-lg text-xs uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-[0_0_15px_rgba(239,68,68,0.25)]"
+              className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
               id="generate-dispute-action"
             >
               {generatingDispute ? (
@@ -265,106 +253,94 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
               href={invoice.file_url}
               target="_blank"
               rel="noreferrer"
-              className="py-2.5 px-3.5 bg-[#111827] hover:bg-[#1C2537] text-[#94A3B8] hover:text-white border border-[#1F2D45] rounded-lg text-xs font-semibold font-mono tracking-wide flex items-center gap-1.5 transition-all"
+              className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 hover:border-gray-300 text-sm font-medium px-4 py-2 rounded-xl inline-flex items-center gap-1.5 transition-all"
             >
               <Download size={14} />
-              <span>Original PDF</span>
+              <span>PDF</span>
             </a>
           )}
         </div>
       </div>
 
-      {/* METADATA DATACARD */}
-      <div className="bg-[#111827] border border-teal-900/10 rounded-xl p-5 md:p-6" id="invoice-metadata-deck">
-        <label className="text-[10px] font-bold text-[#2DD4BF] font-mono uppercase tracking-widest block mb-4">
-          Freight Bill Metadata Details
-        </label>
+      <div className="bg-white border border-gray-100 rounded-2xl p-6" id="invoice-metadata-deck">
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-5 text-left">
           
-          {/* Carrier */}
           <div>
-            <div className="flex items-center gap-1 text-[#94A3B8] text-[10px] font-mono uppercase tracking-wide">
+            <div className="flex items-center gap-1 text-gray-400 text-[10px] font-mono uppercase tracking-wide">
               <Truck size={10} />
               <span>Carrier</span>
             </div>
-            <span className="font-bold text-white text-xs block mt-1 uppercase tracking-tight truncate">
+            <span className="font-semibold text-gray-900 text-sm block mt-1">
               {invoice.carrier_name}
             </span>
           </div>
 
-          {/* Invoice Date */}
           <div>
-            <div className="flex items-center gap-1 text-[#94A3B8] text-[10px] font-mono uppercase tracking-wide">
+            <div className="flex items-center gap-1 text-gray-400 text-[10px] font-mono uppercase tracking-wide">
               <Calendar size={10} />
-              <span>Billed Date</span>
+              <span>Billed</span>
             </div>
-            <span className="font-mono text-zinc-300 text-xs font-semibold block mt-1">
+            <span className="font-mono text-gray-700 text-sm block mt-1">
               {invoice.invoice_date}
             </span>
           </div>
 
-          {/* Shipment Date */}
           <div>
-            <div className="flex items-center gap-1 text-[#94A3B8] text-[10px] font-mono uppercase tracking-wide">
+            <div className="flex items-center gap-1 text-gray-400 text-[10px] font-mono uppercase tracking-wide">
               <Calendar size={10} />
               <span>Ship Date</span>
             </div>
-            <span className="font-mono text-zinc-300 text-xs font-semibold block mt-1">
+            <span className="font-mono text-gray-700 text-sm block mt-1">
               {invoice.shipment_date}
             </span>
           </div>
 
-          {/* Origin */}
           <div>
-            <div className="flex items-center gap-1 text-[#94A3B8] text-[10px] font-mono uppercase tracking-wide">
+            <div className="flex items-center gap-1 text-gray-400 text-[10px] font-mono uppercase tracking-wide">
               <Anchor size={10} />
               <span>Origin</span>
             </div>
-            <span className="font-bold text-teal-400 text-xs block mt-1 truncate">
+            <span className="font-semibold text-indigo-600 text-sm block mt-1 truncate">
               {invoice.origin}
             </span>
           </div>
 
-          {/* Destination */}
           <div>
-            <div className="flex items-center gap-1 text-[#94A3B8] text-[10px] font-mono uppercase tracking-wide">
+            <div className="flex items-center gap-1 text-gray-400 text-[10px] font-mono uppercase tracking-wide">
               <Anchor size={10} />
               <span>Destination</span>
             </div>
-            <span className="font-bold text-teal-400 text-xs block mt-1 truncate">
+            <span className="font-semibold text-indigo-600 text-sm block mt-1 truncate">
               {invoice.destination}
             </span>
           </div>
 
-          {/* Weight */}
           <div>
-            <div className="flex items-center gap-1 text-[#94A3B8] text-[10px] font-mono uppercase tracking-wide">
+            <div className="flex items-center gap-1 text-gray-400 text-[10px] font-mono uppercase tracking-wide">
               <Scale size={10} />
               <span>Weight</span>
             </div>
-            <span className="font-mono text-white text-xs font-bold block mt-1">
+            <span className="font-mono text-gray-900 text-sm font-semibold block mt-1">
               {invoice.weight_lbs?.toLocaleString()} LBS
             </span>
           </div>
 
-          {/* Distance */}
           <div>
-            <div className="flex items-center gap-1 text-[#94A3B8] text-[10px] font-mono uppercase tracking-wide">
+            <div className="flex items-center gap-1 text-gray-400 text-[10px] font-mono uppercase tracking-wide">
               <Navigation size={10} />
               <span>Distance</span>
             </div>
-            <span className="font-mono text-white text-xs font-bold block mt-1">
+            <span className="font-mono text-gray-900 text-sm font-semibold block mt-1">
               {invoice.distance_miles?.toLocaleString()} MI
             </span>
           </div>
 
-          {/* File Name */}
           <div>
-            <div className="flex items-center gap-1 text-[#94A3B8] text-[10px] font-mono uppercase tracking-wide">
+            <div className="flex items-center gap-1 text-gray-400 text-[10px] font-mono uppercase tracking-wide">
               <FileText size={10} />
-              <span>Source File</span>
+              <span>File</span>
             </div>
-            <span className="font-semibold text-zinc-400 text-xs mt-1 block truncate cursor-help" title={invoice.file_name}>
+            <span className="text-gray-500 text-xs mt-1 block truncate cursor-help" title={invoice.file_name}>
               {invoice.file_name}
             </span>
           </div>
@@ -372,80 +348,61 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
         </div>
       </div>
 
-      {/* SUMMARY CARDS ROW */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6" id="invoice-billing-sums-grid">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4" id="invoice-billing-sums-grid">
         
-        {/* Total Billed */}
-        <div className="bg-[#111827] border border-[#1F2D45] rounded-xl p-6 relative overflow-hidden flex flex-col justify-between">
-          <div className="space-y-1.5">
-            <span className="text-[10px] font-bold text-[#EF4444] font-mono uppercase tracking-widest block">Total Billed Amt</span>
-            <p className="text-2xl md:text-3xl font-black text-white font-mono leading-none tracking-tight">
-              {invoice.total_billed.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-            </p>
-          </div>
-          <div className="border-t border-[#1F2D45]/50 pt-3 mt-4 text-[10px] text-[#94A3B8] font-mono uppercase">
-            Aggregated gross charges raw from PDF
-          </div>
+        <div className="bg-white border border-gray-100 rounded-2xl p-5">
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block">Total Billed</span>
+          <p className="text-2xl font-bold font-mono text-gray-900 tabular-nums mt-1">
+            {invoice.total_billed.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+          </p>
+          <p className="text-xs text-gray-400 mt-2">Gross charges from PDF</p>
         </div>
 
-        {/* Contract Approved */}
-        <div className="bg-[#111827] border border-[#1F2D45] rounded-xl p-6 relative overflow-hidden flex flex-col justify-between">
-          <div className="space-y-1.5">
-            <span className="text-[10px] font-bold text-[#10B981] font-mono uppercase tracking-widest block">Contract Approved</span>
-            <p className="text-2xl md:text-3xl font-black text-white font-mono leading-none tracking-tight">
-              {invoice.total_approved.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-            </p>
-          </div>
-          <div className="border-t border-[#1F2D45]/50 pt-3 mt-4 text-[10px] text-[#94A3B8] font-mono uppercase">
-            Total verified within tariff thresholds
-          </div>
+        <div className="bg-white border border-gray-100 rounded-2xl p-5">
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block">Contract Approved</span>
+          <p className="text-2xl font-bold font-mono text-green-600 tabular-nums mt-1">
+            {invoice.total_approved.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+          </p>
+          <p className="text-xs text-gray-400 mt-2">Verified within tariff thresholds</p>
         </div>
 
-        {/* Captured Savings */}
-        <div className="bg-[#111827] border border-[#2DD4BF]/40 shadow-[0_0_20px_rgba(45,212,191,0.15)] rounded-xl p-6 relative overflow-hidden flex flex-col justify-between">
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-center">
-              <span className="text-[10px] font-bold text-[#2DD4BF] font-mono uppercase tracking-widest block">Captured Savings</span>
-              {invoice.total_savings > 0 && (
-                <span className="flex items-center gap-1 text-[9px] font-bold text-black bg-[#2DD4BF] px-2 py-0.5 rounded-full font-mono shadow-[0_0_10px_rgba(45,212,191,0.4)] animate-pulse">
-                  <Sparkles size={10} /> DISCREPANCIES DETECTED
-                </span>
-              )}
-            </div>
-            <p className="text-2xl md:text-3xl font-black text-[#2DD4BF] font-mono leading-none tracking-tight">
-              {invoice.total_savings.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-            </p>
+        <div className="bg-white border border-gray-100 rounded-2xl p-5">
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block">Discrepancy</span>
+            {invoice.total_savings > 0 && (
+              <span className="flex items-center gap-1 text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full font-mono">
+                <Sparkles size={10} /> OVERCHARGE
+              </span>
+            )}
           </div>
-          <div className="border-t border-teal-900/50 pt-3 mt-4 text-[10px] text-[#2DD4BF] font-mono uppercase">
-            Overbill tariff protection claimable refund
-          </div>
+          <p className="text-2xl font-bold font-mono text-red-500 tabular-nums mt-1">
+            {invoice.total_savings.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+          </p>
+          {invoice.total_savings > 0 && (
+            <p className="text-xs text-red-400 mt-1">Potential overcharge</p>
+          )}
         </div>
 
       </div>
 
-      {/* CORE DISCREPANCY TABLE VIEW */}
       <div className="space-y-4">
         <div>
-          <h3 className="text-sm font-bold tracking-tight text-white font-display uppercase">
-            Freight Itemization Ledger Summary
+          <h3 className="text-sm font-semibold text-gray-900">
+            Line Items
           </h3>
-          <p className="text-[10px] text-[#94A3B8] font-mono">
-            CLICK ON ANY ROW TO CROSS CHECK AGAINST SPECIFIC RATINGS FROM RATE-SHEET ID #{contract?.id || 'ALPHA-TARIFF'}
+          <p className="text-xs text-gray-400 mt-0.5">
+            Click any row for detailed audit comparison.
           </p>
         </div>
 
-        {/* Embedded Dynamic Table */}
         <LineItemTable
           lineItems={lineItems}
           contract={contract}
           onLineItemUpdated={async (updatedLine) => {
-            // Instantly update local state inside table
             const nextLines = lineItems.map(
               li => li.id === updatedLine.id ? updatedLine : li
             );
             setLineItems(nextLines);
-
-            // Re-trigger invoice aggregation metrics from database
             await fetchInvoiceData();
           }}
         />

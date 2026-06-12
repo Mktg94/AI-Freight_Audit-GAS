@@ -101,15 +101,15 @@ export default function AuditResultPanel({
   const statusConfig = {
     pending: {
       label: 'Pending Review',
-      style: 'bg-zinc-800/80 text-zinc-400 border border-zinc-700/60'
+      style: 'bg-gray-50 text-gray-600 border-gray-200'
     },
     approved: {
       label: 'Approved Charge',
-      style: 'bg-emerald-500/10 text-[#10B981] border border-emerald-500/20'
+      style: 'bg-green-50 text-green-700 border-green-200'
     },
     disputed: {
       label: 'Disputed Error',
-      style: 'bg-red-500/10 text-[#EF4444] border border-red-500/20 font-bold'
+      style: 'bg-red-50 text-red-600 border-red-200 font-bold'
     }
   };
 
@@ -122,152 +122,135 @@ export default function AuditResultPanel({
           {/* Slide Backdrop with motion */}
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.5 }}
+            animate={{ opacity: 0.4 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-[#0A0F1E] z-[100] cursor-pointer"
+            className="fixed inset-0 bg-black z-[100] cursor-pointer"
             id="audit-result-backdrop"
           />
 
-          {/* Core Panel Card Slider */}
           <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-            className="fixed top-0 right-0 h-full max-w-[480px] w-full bg-[#111827] border-l border-[#1F2D45] shadow-2xl z-[101] flex flex-col justify-between"
+            className="fixed top-0 right-0 h-full max-w-[480px] w-full bg-white border-l border-gray-100 shadow-xl z-[101] flex flex-col justify-between"
             id="audit-result-panel"
           >
-            {/* Header section */}
-            <div className="p-6 border-b border-[#1F2D45] flex items-start justify-between">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-start justify-between">
               <div className="space-y-2 max-w-[340px]">
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] uppercase font-bold tracking-wider font-mono ${statusInfo.style}`}>
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium font-mono ${statusInfo.style}`}>
                   {statusInfo.label}
                 </span>
-                <h3 className="text-sm font-bold text-white leading-relaxed font-display tracking-tight">
+                <h3 className="text-base font-semibold text-gray-900">
                   {lineItem.description}
                 </h3>
               </div>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg border border-[#1F2D45] bg-[#0A0F1E] text-[#94A3B8] hover:text-white transition-colors"
+                className="p-1.5 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
-            {/* Content Drawer Scroll container */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {errorFeedback && (
-                <div className="p-3 rounded-lg border border-red-500/30 bg-red-950/20 text-red-400 text-xs font-mono">
-                  ⚠ Error: {errorFeedback}
+                <div className="p-3 rounded-xl border border-red-100 bg-red-50 text-red-600 text-xs">
+                  Error: {errorFeedback}
                 </div>
               )}
 
-              {/* Billed, Expected, Discrepancy block */}
               <div className="grid grid-cols-3 gap-3">
-                {/* Billed */}
-                <div className="bg-[#0A0F1E] border border-[#1F2D45] rounded-xl p-3 text-center">
-                  <span className="text-[9px] text-[#94A3B8] font-mono uppercase tracking-wider block">Billed Charge</span>
-                  <span className="text-base font-extrabold text-[#EF4444] font-mono block mt-1">
+                <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
+                  <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide block">Billed</span>
+                  <span className="text-lg font-bold text-red-500 font-mono block mt-1">
                     ${lineItem.billed_amount.toFixed(2)}
                   </span>
                 </div>
 
-                {/* Expected */}
-                <div className="bg-[#0A0F1E] border border-[#1F2D45] rounded-xl p-3 text-center">
-                  <span className="text-[9px] text-[#94A3B8] font-mono uppercase tracking-wider block">Expected Rate</span>
-                  <span className="text-base font-extrabold text-[#10B981] font-mono block mt-1">
+                <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
+                  <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide block">Expected</span>
+                  <span className="text-lg font-bold text-green-600 font-mono block mt-1">
                     ${lineItem.expected_amount.toFixed(2)}
                   </span>
                 </div>
 
-                {/* Discrepancy */}
-                <div className={`bg-[#0A0F1E] border rounded-xl p-3 text-center ${
+                <div className={`bg-gray-50 border rounded-xl p-3 text-center ${
                   lineItem.discrepancy > 0 
-                    ? 'border-red-900/40 shadow-[0_0_15px_rgba(239,68,68,0.05)]' 
-                    : lineItem.discrepancy < 0 
-                    ? 'border-emerald-950/40' 
-                    : 'border-[#1F2D45]'
+                    ? 'border-red-100' 
+                    : 'border-gray-100'
                 }`}>
-                  <span className="text-[9px] text-[#94A3B8] font-mono uppercase tracking-wider block">Discrepancy</span>
-                  <span className={`text-base font-extrabold font-mono block mt-1 ${
+                  <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide block">Difference</span>
+                  <span className={`text-lg font-bold font-mono block mt-1 ${
                     lineItem.discrepancy > 0 
-                      ? 'text-[#EF4444]' 
+                      ? 'text-red-500' 
                       : lineItem.discrepancy < 0 
-                      ? 'text-[#10B981]' 
-                      : 'text-zinc-400'
+                      ? 'text-green-600' 
+                      : 'text-gray-400'
                   }`}>
                     {lineItem.discrepancy > 0 ? `+$${lineItem.discrepancy.toFixed(2)}` : lineItem.discrepancy < 0 ? `-$${Math.abs(lineItem.discrepancy).toFixed(2)}` : '$0.00'}
                   </span>
                 </div>
               </div>
 
-              {/* Explanatory description card */}
               {lineItem.discrepancy > 0 && (
-                <div className="bg-[#EF4444]/5 border border-[#EF4444]/20 rounded-xl p-4 flex gap-3 text-xs text-[#94A3B8]">
-                  <AlertOctagon size={18} className="text-[#EF4444] shrink-0 mt-0.5" />
+                <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex gap-3 text-sm text-gray-600">
+                  <AlertOctagon size={18} className="text-red-500 shrink-0 mt-0.5" />
                   <p>
-                    Carrier overbilled this tariff row by <strong className="text-white">${lineItem.discrepancy.toFixed(2)}</strong> (a markup of <strong className="text-white">{((lineItem.discrepancy / (lineItem.expected_amount || 1)) * 100).toFixed(1)}%</strong> above negotiated limits).
+                    Carrier overbilled by <strong className="text-red-600">${lineItem.discrepancy.toFixed(2)}</strong> ({((lineItem.discrepancy / (lineItem.expected_amount || 1)) * 100).toFixed(1)}% above negotiated limits).
                   </p>
                 </div>
               )}
 
-              {/* AI Reasoning */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#2DD4BF] font-mono uppercase tracking-widest block">
-                  AI Compliance Analysis
+                <label className="text-xs font-semibold text-gray-900 uppercase tracking-wide block">
+                  AI Analysis
                 </label>
-                <div className="bg-[#1C2537] border border-teal-900/10 rounded-xl p-4 text-xs text-[#F1F5F9] leading-relaxed relative">
+                <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-sm text-gray-600 leading-relaxed">
                   {lineItem.ai_flag_reason ? (
                     <span>{lineItem.ai_flag_reason}</span>
                   ) : lineItem.discrepancy === 0 ? (
-                    <span>No dynamic discrepancies detected. The raw billed line item matches contract terms with perfect accuracy.</span>
+                    <span>No discrepancies detected. Line item matches contract terms.</span>
                   ) : (
-                    <span>Billed amount differs from contractual terms but no automated reasoning was logged. Please review manually.</span>
+                    <span>Billed amount differs from contractual terms. Manual review recommended.</span>
                   )}
                 </div>
               </div>
 
-              {/* Confidence Score */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#2DD4BF] font-mono uppercase tracking-widest block">
-                  AI Confidence Level
+                <label className="text-xs font-semibold text-gray-900 uppercase tracking-wide block">
+                  AI Confidence
                 </label>
-                <div className="bg-[#0A0F1E] border border-[#1F2D45] rounded-xl p-4">
+                <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
                   <ConfidenceBar score={lineItem.confidence_score} showLabel />
-                  <p className="text-[10px] text-[#94A3B8] mt-2 leading-normal">
-                    This score indicates the artificial intelligence model's extraction accuracy estimate for billing tables and accessorial rates in this PDF segment.
-                  </p>
                 </div>
               </div>
 
-              <div className="border-t border-[#1F2D45] my-6" />
+              <div className="border-t border-gray-100 my-4" />
 
-              {/* Contract Term reference section */}
               <div className="space-y-2">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#2DD4BF] font-mono uppercase tracking-widest">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-900 uppercase tracking-wide">
                   <Info size={12} />
-                  <span>Contract Term Violation</span>
+                  <span>Contract Reference</span>
                 </div>
-                <div className="bg-[#0A0F1E] border border-teal-900/10 rounded-xl p-4 space-y-3">
-                  <div className="flex justify-between text-[11px] font-mono border-b border-[#1F2D45]/50 pb-2">
-                    <span className="text-zinc-500 uppercase">Carrier agreement</span>
-                    <span className="text-[#2DD4BF] font-medium">{contract?.carrier_name || 'Carrier contract profile'}</span>
+                <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                  <div className="flex justify-between text-xs font-mono border-b border-gray-100 pb-2">
+                    <span className="text-gray-400 uppercase">Carrier</span>
+                    <span className="text-indigo-600 font-medium">{contract?.carrier_name || 'N/A'}</span>
                   </div>
-                  <p className="text-xs text-[#94A3B8] leading-relaxed">
+                  <p className="text-sm text-gray-600 leading-relaxed">
                     {getContractViolationString()}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Footer Buttons Section */}
-            <div className="p-6 bg-[#0E1324] border-t border-[#1F2D45]">
+            <div className="p-4 bg-white border-t border-gray-100">
               <PermissionGate 
                 action="review_line_items"
                 fallback={
-                  <div className="w-full text-center text-xs text-[#94A3B8] font-mono uppercase tracking-wider py-2">
+                  <div className="w-full text-center text-xs text-gray-400 py-2">
                     Line item review restricted to authorized roles
                   </div>
                 }
@@ -277,24 +260,24 @@ export default function AuditResultPanel({
                     type="button"
                     onClick={() => handleUpdateStatus('approved')}
                     disabled={loadingAction !== null}
-                    className="w-full py-3 bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500 hover:text-black font-semibold rounded-xl text-xs uppercase tracking-wider font-mono text-center flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-55"
+                    className="w-full py-2.5 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 font-medium rounded-xl text-sm text-center flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                   >
                     {loadingAction === 'approve' ? (
-                      <Loader2 size={14} className="animate-spin text-emerald-400" />
+                      <Loader2 size={14} className="animate-spin" />
                     ) : (
                       <CheckCircle2 size={14} />
                     )}
-                    <span>Approve Charge</span>
+                    <span>Approve</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleUpdateStatus('disputed')}
                     disabled={loadingAction !== null}
-                    className="w-full py-3 bg-red-500/10 border border-red-500/40 hover:bg-red-500 hover:text-white font-semibold rounded-xl text-xs uppercase tracking-wider font-mono text-center flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-55"
+                    className="w-full py-2.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-medium rounded-xl text-sm text-center flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                   >
                     {loadingAction === 'dispute' ? (
-                      <Loader2 size={14} className="animate-spin text-red-400" />
+                      <Loader2 size={14} className="animate-spin" />
                     ) : (
                       <AlertOctagon size={14} />
                     )}

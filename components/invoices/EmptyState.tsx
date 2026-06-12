@@ -20,23 +20,23 @@ export default function EmptyState({ onUploadClick }: EmptyStateProps) {
 
   return (
     <div 
-      className="flex flex-col items-center justify-center p-12 text-center rounded-2xl bg-[#111827] border border-teal-900/40 shadow-[0_0_30px_rgba(45,212,191,0.03)] space-y-5 max-w-lg mx-auto"
+      className="flex flex-col items-center justify-center py-16 text-center space-y-4 max-w-lg mx-auto"
       id="invoices-empty-state"
     >
-      <div className="p-4 bg-[#1C2537] border border-[#1F2D45] text-[#2DD4BF] rounded-full shadow-[0_0_20px_rgba(45,212,191,0.1)]">
-        <FileText size={40} />
+      <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center">
+        <FileText size={20} className="text-gray-400" />
       </div>
 
-      <div className="space-y-2">
-        <h3 className="text-lg font-black font-display text-white uppercase tracking-tight">No invoices yet</h3>
-        <p className="text-xs text-[#94A3B8] max-w-sm leading-relaxed">
-          Upload your first freight invoice to begin auditing and automatically claiming carriage rate protection.
+      <div className="space-y-1">
+        <h3 className="text-sm font-semibold text-gray-900">No invoices yet</h3>
+        <p className="text-sm text-gray-400 max-w-xs leading-relaxed">
+          Upload your first freight invoice to begin auditing and catching overcharges.
         </p>
       </div>
 
       <button
         onClick={handleUploadClick}
-        className="py-2.5 px-5 bg-[#2DD4BF] hover:bg-[#14B8A4] text-black font-bold rounded-lg text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(45,212,191,0.3)] hover:shadow-[0_0_25px_rgba(45,212,191,0.45)] flex items-center gap-2 cursor-pointer font-mono"
+        className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-xl inline-flex items-center gap-2 transition-colors duration-150 cursor-pointer"
         id="empty-state-upload-btn"
       >
         <Upload size={14} />

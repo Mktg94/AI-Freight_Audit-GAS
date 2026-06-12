@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { 
   LayoutDashboard, FileText, FileSignature, AlertCircle, 
-  BarChart2, Settings, LogOut, Ship, X, User, Globe 
+  BarChart2, Settings, LogOut, X, User
 } from 'lucide-react';
 import { useRole } from '@/lib/auth/RoleContext';
 
@@ -14,7 +14,6 @@ export default function Sidebar() {
   const [userEmail, setUserEmail] = useState('audit@atlaslogistics.com');
   const [userName, setUserName] = useState('Atlas Audit Team');
 
-  // Load pathname and setup popstate event listeners for routing synchronicity
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setPathname(window.location.pathname);
@@ -25,7 +24,6 @@ export default function Sidebar() {
       
       window.addEventListener('popstate', handleLocationChange);
       
-      // Responsive Sidebar events dispatched by hamburger in TopBar
       const handleToggleSidebar = () => {
         setIsOpen(prev => !prev);
       };
@@ -38,7 +36,6 @@ export default function Sidebar() {
     }
   }, []);
 
-  // Fetch Supabase authenticated meta details or fall back to mock profile
   useEffect(() => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -48,18 +45,17 @@ export default function Sidebar() {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
           setUserEmail(session.user.email || 'user@company.com');
-          setUserName(session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Atlas Audit User');
+          setUserName(session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User');
         }
       });
     } else {
-      // Local caching verification
       const cached = localStorage.getItem('fa_mock_session');
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
           if (parsed?.user) {
             setUserEmail(parsed.user.email || 'audit@atlaslogistics.com');
-            setUserName(parsed.user.user_metadata?.full_name || 'Atlas Audit User');
+            setUserName(parsed.user.user_metadata?.full_name || 'User');
           }
         } catch (e) {}
       }
@@ -106,63 +102,74 @@ export default function Sidebar() {
     navLinks.push({ label: 'Settings', path: '/settings', icon: Settings });
   }
 
-  // Role display helpers
   const getRoleConfig = (currentRole: string) => {
     switch (currentRole) {
       case 'admin':
-        return { label: 'Admin', style: 'bg-teal-500/10 text-[#2dd4bf] border-[#2dd4bf]/20' };
+        return { label: 'Admin', style: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
       case 'logistics_manager':
-        return { label: 'Logistics Manager', style: 'bg-blue-500/10 text-[#3b82f6] border-[#3b82f6]/20' };
+        return { label: 'Logistics Manager', style: 'bg-blue-50 text-blue-700 border-blue-200' };
       case 'finance_clerk':
-        return { label: 'Finance Clerk', style: 'bg-amber-500/10 text-[#f59e0b] border-[#f59e0b]/20' };
+        return { label: 'Finance Clerk', style: 'bg-amber-50 text-amber-700 border-amber-200' };
       case 'operations_coordinator':
-        return { label: 'Operations Coord.', style: 'bg-slate-500/10 text-[#94a3b8] border-[#94a3b8]/20' };
+        return { label: 'Operations Coord.', style: 'bg-gray-100 text-gray-600 border-gray-200' };
       default:
-        return { label: 'Auditor', style: 'bg-zinc-800 text-zinc-400 border border-zinc-700/60' };
+        return { label: 'Auditor', style: 'bg-gray-100 text-gray-600 border-gray-200' };
     }
   };
   const roleConfig = getRoleConfig(role);
 
+  const getInitials = (nameStr: string) => {
+    const parts = nameStr.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return parts[0].substring(0, 2).toUpperCase();
+  };
+
   return (
     <>
-      {/* Mobile Back-drop overlay when responsive side-drawer is active */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden"
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
 
-      {/* Main Persistent Desktop + Mobile Slide-Out Drawer Sidebar */}
       <aside 
         id="side-navigation-panel"
-        className={`fixed top-0 bottom-0 left-0 w-[240px] bg-[var(--bg-surface)] border-r border-[var(--border-color)] flex flex-col justify-between z-50 transition-transform duration-300 md:translate-x-0 ${
+        className={`fixed top-0 bottom-0 left-0 w-[220px] bg-white border-r border-gray-100 flex flex-col justify-between z-50 transition-transform duration-300 md:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex flex-col flex-1">
-          {/* Logo Branding and Header */}
-          <div className="h-16 flex items-center justify-between px-6 border-b border-[var(--border-color)]">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-[var(--accent-color)]/10 text-[var(--accent-color)] border border-[var(--accent-color)]/20">
-                <Ship size={16} className="text-[var(--accent-color)]" />
+          {/* Logo Branding */}
+          <div className="px-5 pt-5 pb-4">
+            <a href="/dashboard" onClick={(e) => navigateTo('/dashboard', e)} className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
+                <span className="font-bold text-sm text-white">F</span>
               </div>
-              <span className="text-sm font-bold tracking-tight text-[var(--text-primary)] font-display">
-                FreightAudit <span className="text-[var(--accent-color)]">AI</span>
+              <span className="font-semibold text-gray-900 text-sm">
+                FreightAudit <span className="text-indigo-600">AI</span>
               </span>
-            </div>
-            
-            {/* Close trigger (mobile only) */}
-            <button 
-              onClick={() => setIsOpen(false)}
-              className="md:hidden text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 transition-colors"
-            >
-              <X size={16} />
-            </button>
+            </a>
+            <span className="inline-block mt-1.5 bg-indigo-50 text-indigo-600 text-[10px] px-1.5 py-0.5 rounded-md font-mono font-semibold">
+              Beta
+            </span>
           </div>
 
-          {/* Navigation link block queue */}
-          <nav className="p-4 space-y-1" role="navigation">
+          {/* Close button (mobile) */}
+          <button 
+            onClick={() => setIsOpen(false)}
+            className="md:hidden absolute top-4 right-4 text-gray-400 hover:text-gray-700 p-1 transition-colors"
+          >
+            <X size={16} />
+          </button>
+
+          {/* Navigation */}
+          <nav className="px-3 space-y-0.5" role="navigation">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-3 mt-4 mb-2 block">
+              Main
+            </span>
             {navLinks.map((link) => {
               const IconComp = link.icon;
               const isActive = pathname === link.path || (link.path !== '/dashboard' && pathname.startsWith(link.path));
@@ -172,13 +179,13 @@ export default function Sidebar() {
                   key={link.path}
                   href={link.path}
                   onClick={(e) => navigateTo(link.path, e)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg mx-0 text-sm font-medium transition-colors duration-150 ${
                     isActive 
-                      ? 'border-l-2 border-[var(--accent-color)] text-[var(--accent-color)] bg-[var(--accent-color)]/10' 
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+                      ? 'text-indigo-600 bg-indigo-50 border-l-2 border-indigo-600 -ml-[1px] pl-[13px]' 
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  <IconComp size={15} className="shrink-0" />
+                  <IconComp size={16} className="shrink-0" />
                   <span>{link.label}</span>
                 </a>
               );
@@ -186,27 +193,26 @@ export default function Sidebar() {
           </nav>
         </div>
 
-        {/* User Identity Profile Footer Area */}
-        <div className="p-4 border-t border-[var(--border-color)] space-y-3.5 bg-[var(--bg-primary)]/40" id="sidebar-user-anchor">
-          <div className="flex items-center gap-3">
-            <div className="p-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-color)] text-[var(--accent-color)] h-8 w-8 flex items-center justify-center shrink-0">
-              <User size={14} />
+        {/* User Profile Footer */}
+        <div className="border-t border-gray-100 p-3 mt-auto">
+          <div className="flex items-center gap-3 px-1 mb-3">
+            <div className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-600 text-xs font-mono font-semibold flex items-center justify-center shrink-0">
+              {getInitials(userName)}
             </div>
-            <div className="overflow-hidden leading-snug text-left flex-1">
-              <span className="text-[11px] font-bold text-[var(--text-primary)] block truncate leading-tight mb-0.5">{userName}</span>
-              <span className="text-[9px] text-[var(--text-secondary)] block truncate font-mono mb-1.5 leading-tight">{userEmail}</span>
-              <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-extrabold font-mono border ${roleConfig.style}`}>
-                {roleConfig.label}
-              </span>
+            <div className="overflow-hidden leading-snug text-left flex-1 min-w-0">
+              <span className="text-sm text-gray-900 font-medium block truncate">{userName}</span>
+              <span className="text-xs text-gray-500 block truncate">{userEmail}</span>
             </div>
           </div>
-          
+          <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-semibold font-mono border mx-1 mb-2 ${roleConfig.style}`}>
+            {roleConfig.label}
+          </span>
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-[var(--danger-color)]/5 hover:bg-[var(--danger-color)]/10 border border-[var(--danger-color)]/10 hover:border-[var(--danger-color)]/20 text-[var(--danger-color)] rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 text-gray-400 hover:text-gray-700 text-xs font-medium rounded-lg transition-colors duration-150 cursor-pointer mt-2"
           >
-            <LogOut size={11} />
-            <span>Sign Out Auditor</span>
+            <LogOut size={12} />
+            <span>Sign Out</span>
           </button>
         </div>
       </aside>

@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Search, Calendar, SlidersHorizontal, RotateCcw } from 'lucide-react';
-import { InvoiceStatus } from '@/types';
+import { Search, RotateCcw } from 'lucide-react';
 
 interface FilterBarProps {
   initialSearch?: string;
@@ -29,7 +28,6 @@ export default function FilterBar({
   const [fromDate, setFromDate] = useState(initialFromDate);
   const [toDate, setToDate] = useState(initialToDate);
 
-  // Debounce search change by 300ms
   useEffect(() => {
     const timer = setTimeout(() => {
       onFilterChange({ search, status, fromDate, toDate });
@@ -38,7 +36,6 @@ export default function FilterBar({
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Handle immediate changes for other filters
   const handleStatusChange = (newStatus: string) => {
     setStatus(newStatus);
     onFilterChange({ search, status: newStatus, fromDate, toDate });
@@ -64,44 +61,35 @@ export default function FilterBar({
 
   return (
     <div 
-      className="bg-[#111827] border border-teal-900/20 rounded-xl p-4 md:p-5 space-y-4"
+      className="bg-white border border-gray-100 rounded-2xl p-4 space-y-4"
       id="invoices-filter-bar"
     >
-      <div className="flex items-center gap-2 mb-1.5">
-        <SlidersHorizontal size={14} className="text-[#2DD4BF]" />
-        <span className="text-[10px] font-bold font-mono text-[#2DD4BF] uppercase tracking-widest">
-          Audit Ledger Filters
-        </span>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-        {/* Search Input - 4 cols */}
         <div className="md:col-span-4 relative">
-          <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider mb-1.5">
-            Search Invoices
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">
+            Search
           </label>
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#475569]" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search ID, carrier code..."
+              placeholder="Search ID, carrier..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3.5 py-2 bg-[#0A0F1E] text-[#F1F5F9] border border-[#1F2D45] rounded-lg text-xs font-medium placeholder-[#475569] focus:outline-none focus:border-[#2DD4BF] transition-all"
+              className="w-full pl-9 pr-3.5 py-2 bg-white text-gray-900 border border-gray-200 rounded-xl text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all"
               id="filter-search-input"
             />
           </div>
         </div>
 
-        {/* Status Dropdown - 3 cols */}
         <div className="md:col-span-3">
-          <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider mb-1.5">
-            Audit Status
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">
+            Status
           </label>
           <select
             value={status}
             onChange={(e) => handleStatusChange(e.target.value)}
-            className="w-full px-3 py-2 bg-[#0A0F1E] text-[#F1F5F9] border border-[#1F2D45] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#2DD4BF] transition-all"
+            className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all"
             id="filter-status-select"
           >
             <option value="all">All Statuses</option>
@@ -113,48 +101,41 @@ export default function FilterBar({
           </select>
         </div>
 
-        {/* Date Ranges - 4 cols */}
         <div className="md:col-span-4 grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider mb-1.5">
-              From Date
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">
+              From
             </label>
-            <div className="relative">
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => handleFromDateChange(e.target.value)}
-                className="w-full px-2.5 py-2 bg-[#0A0F1E] text-[#F1F5F9] border border-[#1F2D45] rounded-lg text-xs font-mono focus:outline-none focus:border-[#2DD4BF] transition-all"
-                id="filter-from-date"
-              />
-            </div>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => handleFromDateChange(e.target.value)}
+              className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all"
+              id="filter-from-date"
+            />
           </div>
           <div>
-            <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider mb-1.5">
-              To Date
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">
+              To
             </label>
-            <div className="relative">
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => handleToDateChange(e.target.value)}
-                className="w-full px-2.5 py-2 bg-[#0A0F1E] text-[#F1F5F9] border border-[#1F2D45] rounded-lg text-xs font-mono focus:outline-none focus:border-[#2DD4BF] transition-all"
-                id="filter-to-date"
-              />
-            </div>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => handleToDateChange(e.target.value)}
+              className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all"
+              id="filter-to-date"
+            />
           </div>
         </div>
 
-        {/* Reset Trigger - 1 col */}
         <div className="md:col-span-1 flex items-end justify-end">
           <button
             onClick={handleReset}
-            className="w-full md:w-auto p-2.5 bg-[#1C2537] hover:bg-[#2DD4BF] border border-[#1F2D45] text-[#94A3B8] hover:text-black rounded-lg transition-all flex items-center justify-center gap-1 text-xs font-bold cursor-pointer font-mono uppercase shrink-0"
+            className="w-full md:w-auto p-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-500 hover:text-gray-700 rounded-xl transition-all flex items-center justify-center gap-1 text-sm font-medium cursor-pointer"
             title="Reset Filters"
             id="filter-reset-action"
           >
             <RotateCcw size={14} />
-            <span className="md:hidden">Reset</span>
           </button>
         </div>
       </div>

@@ -30,9 +30,8 @@ export default function LineItemTable({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
-  // Triggering inline fast actions
   const handleQuickStatusUpdate = async (e: React.MouseEvent, itemId: string, newStatus: 'approved' | 'disputed') => {
-    e.stopPropagation(); // Avoid triggering row selection drawer
+    e.stopPropagation();
     setActionLoadingId(`${itemId}-${newStatus}`);
 
     try {
@@ -52,7 +51,6 @@ export default function LineItemTable({
       if (result.success && result.lineItem) {
         onLineItemUpdated(result.lineItem);
         
-        // Throw global toast notification
         window.dispatchEvent(new CustomEvent('show-toast', {
           detail: {
             title: newStatus === 'approved' ? 'Compliance Approved' : 'Dispute Flagged',
@@ -67,12 +65,11 @@ export default function LineItemTable({
     }
   };
 
-  // Define columns in alignment with the requested design sheet
   const columns = useMemo(() => [
     columnHelper.accessor('description', {
       header: 'Description',
       cell: (info) => (
-        <span className="font-semibold text-white tracking-tight uppercase text-xs">
+        <span className="font-medium text-gray-900 text-sm">
           {info.getValue()}
         </span>
       ),
@@ -80,7 +77,7 @@ export default function LineItemTable({
     columnHelper.accessor('billed_amount', {
       header: 'Billed ($)',
       cell: (info) => (
-        <span className="font-mono font-bold text-white">
+        <span className="font-mono font-medium text-gray-900">
           ${info.getValue().toFixed(2)}
         </span>
       ),
@@ -88,7 +85,7 @@ export default function LineItemTable({
     columnHelper.accessor('expected_amount', {
       header: 'Expected ($)',
       cell: (info) => (
-        <span className="font-mono font-bold text-teal-400">
+        <span className="font-mono font-medium text-green-600">
           ${info.getValue().toFixed(2)}
         </span>
       ),
@@ -98,11 +95,11 @@ export default function LineItemTable({
       cell: (info) => {
         const val = info.getValue();
         if (val > 0) {
-          return <span className="font-mono font-extrabold text-[#EF4444]">+${val.toFixed(2)}</span>;
+          return <span className="font-mono font-semibold text-red-500">+${val.toFixed(2)}</span>;
         } else if (val < 0) {
-          return <span className="font-mono font-extrabold text-[#10B981]">-${Math.abs(val).toFixed(2)}</span>;
+          return <span className="font-mono font-semibold text-green-600">-${Math.abs(val).toFixed(2)}</span>;
         }
-        return <span className="font-mono text-zinc-500">$0.00</span>;
+        return <span className="font-mono text-gray-300">—</span>;
       },
     }),
     columnHelper.accessor('confidence_score', {
@@ -121,7 +118,7 @@ export default function LineItemTable({
         const dispText = isTruncated ? `${val.substring(0, 60)}...` : val || '—';
         return (
           <span 
-            className="text-[11px] text-[#94A3B8] block max-w-xs truncate cursor-help"
+            className="text-xs text-gray-400 block max-w-xs truncate cursor-help"
             title={val || undefined}
           >
             {dispText}
@@ -133,7 +130,6 @@ export default function LineItemTable({
       header: 'Status',
       cell: (info) => {
         const value = info.getValue();
-        // Fallback or safety mapping to ensure InvoiceStatus compatibility
         const statusVal = value === 'pending' ? 'pending' : value === 'approved' ? 'approved' : 'disputed';
         return <InvoiceStatusBadge status={statusVal} />;
       },
@@ -147,15 +143,15 @@ export default function LineItemTable({
         const isDisputeLoading = actionLoadingId === `${rowData.id}-disputed`;
 
         return (
-          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+          <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
             {rowData.status !== 'approved' && (
               <button
                 onClick={(e) => handleQuickStatusUpdate(e, rowData.id, 'approved')}
                 disabled={actionLoadingId !== null}
-                className="flex items-center gap-1 px-2.5 py-1 text-[10px] bg-emerald-500/10 hover:bg-emerald-500 hover:text-black border border-emerald-500/30 text-[#10B981] font-bold font-mono uppercase rounded transition-all cursor-pointer disabled:opacity-50"
+                className="flex items-center gap-1 px-2.5 py-1 text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 font-medium rounded-lg transition-all cursor-pointer disabled:opacity-50"
               >
                 {isApproveLoading ? (
-                  <Loader2 size={10} className="animate-spin text-emerald-400" />
+                  <Loader2 size={10} className="animate-spin" />
                 ) : (
                   <Check size={10} />
                 )}
@@ -167,10 +163,10 @@ export default function LineItemTable({
               <button
                 onClick={(e) => handleQuickStatusUpdate(e, rowData.id, 'disputed')}
                 disabled={actionLoadingId !== null}
-                className="flex items-center gap-1 px-2.5 py-1 text-[10px] bg-red-500/10 hover:bg-red-500 hover:text-white border border-red-500/30 text-[#EF4444] font-bold font-mono uppercase rounded transition-all cursor-pointer disabled:opacity-50"
+                className="flex items-center gap-1 px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-medium rounded-lg transition-all cursor-pointer disabled:opacity-50"
               >
                 {isDisputeLoading ? (
-                  <Loader2 size={10} className="animate-spin text-red-400" />
+                  <Loader2 size={10} className="animate-spin" />
                 ) : (
                   <AlertTriangle size={10} />
                 )}
@@ -200,16 +196,16 @@ export default function LineItemTable({
 
   return (
     <div className="w-full space-y-4" id="line-items-database-table">
-      <div className="overflow-hidden border border-[#1F2D45] rounded-xl bg-[#111827]">
+      <div className="overflow-hidden border border-gray-100 rounded-2xl bg-white">
         <table className="w-full text-left border-collapse" role="table">
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr 
                 key={headerGroup.id} 
-                className="border-b border-[#1F2D45] bg-[#0E1324] text-[#94A3B8] text-[10px] font-bold uppercase tracking-wider font-mono"
+                className="border-b border-gray-100 bg-gray-50 text-gray-400 text-[10px] font-semibold uppercase tracking-widest font-mono"
               >
                 {headerGroup.headers.map((header) => (
-                  <th key={header.id} className="py-3.5 px-4 font-mono">
+                  <th key={header.id} className="py-3 px-4">
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -226,14 +222,13 @@ export default function LineItemTable({
               const rowStatus = row.original.status;
               const hasDiscrepancy = row.original.discrepancy > 0;
               
-              // Resolve background classes
-              let rowBgClass = 'hover:bg-[#1C2537]/20 border-b border-[#1F2D45]/40 transition-colors cursor-pointer';
+              let rowBgClass = 'hover:bg-gray-50 border-b border-gray-50 transition-colors cursor-pointer';
               if (rowStatus === 'pending' || hasDiscrepancy) {
-                rowBgClass = 'bg-amber-950/15 hover:bg-amber-950/25 border-l-2 border-amber-500 border-b border-[#1F2D45]/40 transition-colors cursor-pointer';
+                rowBgClass = 'bg-amber-50/40 hover:bg-amber-50 border-l-2 border-amber-400 border-b border-gray-50 transition-colors cursor-pointer';
               } else if (rowStatus === 'approved') {
-                rowBgClass = 'bg-emerald-950/10 hover:bg-emerald-950/15 border-b border-[#1F2D45]/40 transition-colors cursor-pointer';
+                rowBgClass = 'bg-green-50/40 hover:bg-green-50 border-b border-gray-50 transition-colors cursor-pointer';
               } else if (rowStatus === 'disputed') {
-                rowBgClass = 'bg-red-950/10 hover:bg-red-950/15 border-l-2 border-red-500 border-b border-[#1F2D45]/40 transition-colors cursor-pointer';
+                rowBgClass = 'bg-red-50/40 hover:bg-red-50 border-l-2 border-red-400 border-b border-gray-50 transition-colors cursor-pointer';
               }
 
               return (
@@ -243,7 +238,7 @@ export default function LineItemTable({
                   className={rowBgClass}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="py-4 px-4 text-xs">
+                    <td key={cell.id} className="py-3 px-4 text-sm">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -253,8 +248,8 @@ export default function LineItemTable({
 
             {lineItems.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-[#94A3B8] text-xs">
-                  No line items processed for this freight bill yet. Try running the auditing engine pipeline.
+                <td colSpan={8} className="py-12 text-center text-sm text-gray-400">
+                  No line items processed yet.
                 </td>
               </tr>
             )}
@@ -262,7 +257,6 @@ export default function LineItemTable({
         </table>
       </div>
 
-      {/* Floating Detailed Audit result sheet */}
       <AuditResultPanel
         isOpen={isDrawerOpen}
         onClose={() => {

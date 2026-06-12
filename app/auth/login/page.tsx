@@ -17,7 +17,6 @@ export default function LoginPage({ onLoginSuccess, onNavigateToSignup }: LoginP
   const [useMock, setUseMock] = useState(false);
 
   useEffect(() => {
-    // Check if Supabase keys are configured or we should run in dev-safe mock mode
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
     
@@ -38,7 +37,6 @@ export default function LoginPage({ onLoginSuccess, onNavigateToSignup }: LoginP
 
     try {
       if (useMock) {
-        // Safe simulator mode for AI Studio sandbox environments lacking Supabase DB secrets
         await new Promise(resolve => setTimeout(resolve, 1200));
         
         if (password.length < 6) {
@@ -59,14 +57,12 @@ export default function LoginPage({ onLoginSuccess, onNavigateToSignup }: LoginP
         if (onLoginSuccess) {
           onLoginSuccess(mockSession);
         } else {
-          // Fallback standard routing
           window.history.pushState({}, '', '/dashboard');
           window.dispatchEvent(new Event('popstate'));
         }
         return;
       }
 
-      // Real Supabase Auth Execution
       const supabase = createClient();
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -93,55 +89,48 @@ export default function LoginPage({ onLoginSuccess, onNavigateToSignup }: LoginP
     }
   };
 
-  // Demo fill helper
   const fillDemoCredentials = () => {
     setEmail('audit@atlaslogistics.com');
     setPassword('demopass123');
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E] flex flex-col items-center justify-center p-6 relative overflow-hidden" id="auth-login-screen">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 relative" id="auth-login-screen">
       
-      {/* Decorative subtle gradient background glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-teal-500/5 blur-[100px] rounded-full pointer-events-none" />
-
-      <div className="w-full max-w-md bg-[#111827] border border-teal-900/40 rounded-xl p-8 relative z-10 shadow-[0_4px_30px_rgba(0,0,0,0.4)]">
+      <div className="w-full max-w-md bg-white border border-gray-100 rounded-2xl p-8 relative z-10 shadow-sm">
         
-        {/* Branding header bar */}
         <div className="flex flex-col items-center text-center space-y-3 mb-8">
-          <div className="h-12 w-12 rounded-xl bg-gradient-to-tr from-teal-500 to-teal-400 p-0.5 flex items-center justify-center shadow-[0_0_20px_rgba(45,212,191,0.25)]">
-            <div className="h-full w-full bg-[#111827] rounded-[10px] flex items-center justify-center">
-              <ShieldCheck className="text-[#2DD4BF] h-6 w-6 animate-pulse" />
-            </div>
+          <div className="h-12 w-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+            <ShieldCheck className="text-indigo-600 h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-[#2DD4BF] font-display">
-              FreightAudit <span className="text-white">AI</span>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+              FreightAudit <span className="text-indigo-600">AI</span>
             </h1>
-            <p className="text-[10px] text-[#2DD4BF] font-mono tracking-widest uppercase mt-0.5 font-bold">
+            <p className="text-[10px] text-indigo-600 font-mono tracking-widest uppercase mt-0.5 font-semibold">
               Automated Billing Protection
             </p>
           </div>
-          <h2 className="text-lg font-medium text-white tracking-tight mt-4 font-display">
+          <h2 className="text-lg font-semibold text-gray-900 tracking-tight mt-4">
             Welcome back
           </h2>
-          <p className="text-xs text-[#94A3B8]">
+          <p className="text-sm text-gray-500">
             Sign in to access secure carrier audit ledgers and dispute generators
           </p>
         </div>
 
         {useMock && (
-          <div className="mb-6 p-3 bg-teal-500/10 border border-teal-500/20 rounded-lg text-left">
-            <div className="flex items-center gap-1.5 text-[#2DD4BF] font-bold text-[10px] uppercase tracking-wider mb-1">
+          <div className="mb-6 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-left">
+            <div className="flex items-center gap-1.5 text-indigo-600 font-semibold text-[10px] uppercase tracking-wider mb-1">
               <Sparkles size={12} /> Sandbox Interactive Mode
             </div>
-            <p className="text-[10px] text-zinc-400 leading-normal">
+            <p className="text-[10px] text-gray-500 leading-normal">
               Running without active cloud secrets. Log in with any email & password (min 6 chars) or click autofill to use simulated accounts.
             </p>
             <button
               type="button"
               onClick={fillDemoCredentials}
-              className="mt-2 text-[10px] font-semibold text-[#2DD4BF] hover:underline"
+              className="mt-2 text-[10px] font-semibold text-indigo-600 hover:underline"
             >
               Autofill Atlas Global Logistics Test Account
             </button>
@@ -149,13 +138,12 @@ export default function LoginPage({ onLoginSuccess, onNavigateToSignup }: LoginP
         )}
 
         <form onSubmit={handleSignIn} className="space-y-5">
-          {/* Email Form Entry */}
           <div className="space-y-1.5">
-            <label className="block text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider">
+            <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
               Corporate Email Address
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-500">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
                 <Mail size={15} />
               </span>
               <input
@@ -164,20 +152,19 @@ export default function LoginPage({ onLoginSuccess, onNavigateToSignup }: LoginP
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
-                className="w-full pl-10 pr-4 py-2.5 bg-[#0A0F1E] text-[#F1F5F9] border border-[#1F2D45] rounded-lg focus:outline-none focus:border-[#2DD4BF] focus:ring-1 focus:ring-[#2DD4BF] placeholder-[#475569] text-xs transition-colors shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/20 placeholder-gray-400 text-xs transition-colors"
               />
             </div>
           </div>
 
-          {/* Password Form Entry */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
-              <label className="block text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider">
+              <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                 Account Password
               </label>
             </div>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-500">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
                 <Lock size={15} />
               </span>
               <input
@@ -186,16 +173,15 @@ export default function LoginPage({ onLoginSuccess, onNavigateToSignup }: LoginP
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-2.5 bg-[#0A0F1E] text-[#F1F5F9] border border-[#1F2D45] rounded-lg focus:outline-none focus:border-[#2DD4BF] focus:ring-1 focus:ring-[#2DD4BF] placeholder-[#475569] text-xs transition-colors shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/20 placeholder-gray-400 text-xs transition-colors"
               />
             </div>
           </div>
 
-          {/* Sign-In Submit Trigger */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 bg-[#2DD4BF] hover:bg-[#14B8A4] disabled:opacity-50 text-black font-semibold rounded-lg text-xs tracking-wide uppercase transition-all shadow-[0_0_20px_rgba(45,212,191,0.2)] hover:shadow-[0_0_25px_rgba(45,212,191,0.35)] flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold rounded-xl text-xs tracking-wide uppercase transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
           >
             {loading ? (
               <>
@@ -207,24 +193,22 @@ export default function LoginPage({ onLoginSuccess, onNavigateToSignup }: LoginP
             )}
           </button>
 
-          {/* Red Inline Error Block */}
           {errorMsg && (
-            <div className="p-3 bg-red-500/10 border border-red-500/35 rounded-lg text-center">
-              <p className="text-[11px] text-red-400 font-semibold leading-normal">{errorMsg}</p>
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-center">
+              <p className="text-[11px] text-red-600 font-medium leading-normal">{errorMsg}</p>
             </div>
           )}
         </form>
 
-        {/* Link back over to Signup */}
-        <div className="mt-6 text-center text-xs">
-          <span className="text-[#94A3B8] font-medium">Don't have an account? </span>
+        <div className="mt-6 text-center text-sm">
+          <span className="text-gray-400 font-medium">Don't have an account? </span>
           <button
             type="button"
             onClick={onNavigateToSignup ? onNavigateToSignup : () => {
               window.history.pushState({}, '', '/auth/signup');
               window.dispatchEvent(new Event('popstate'));
             }}
-            className="text-[#2DD4BF] font-semibold hover:underline bg-transparent border-none cursor-pointer"
+            className="text-indigo-600 font-semibold hover:underline bg-transparent border-none cursor-pointer"
           >
             Sign up
           </button>
@@ -232,8 +216,7 @@ export default function LoginPage({ onLoginSuccess, onNavigateToSignup }: LoginP
 
       </div>
 
-      {/* Corporate trust and indicators */}
-      <p className="text-[10px] text-zinc-600 mt-8 font-mono tracking-wider">
+      <p className="text-[10px] text-gray-400 mt-8 font-mono tracking-wider">
         FreightAudit AI &bull; Secure AES Encryption &bull; v1.4.0
       </p>
     </div>

@@ -1,10 +1,7 @@
-"use client";
-
 import React, { useState, useEffect, useMemo } from 'react';
-import { Upload, FileText, CloudLightning, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Upload, FileText } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Invoice } from '@/types';
-import { initialInvoices } from '@/src/fakeData';
 import FilterBar from '@/components/invoices/FilterBar';
 import DataTable from '@/components/invoices/DataTable';
 import EmptyState from '@/components/invoices/EmptyState';
@@ -13,61 +10,33 @@ import UsageLimitBanner from '@/components/shared/UsageLimitBanner';
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isRealSupabase, setIsRealSupabase] = useState(false);
 
-  // Filter States synced with URL
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
-  // Batch Filter tab state
   const [batchFilter, setBatchFilter] = useState<'all' | 'single' | 'batch'>('all');
 
   const fetchInvoices = async () => {
     setLoading(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .order('uploaded_at', { ascending: false });
 
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-    const hasSupabaseKeys = supabaseUrl && supabaseKey && !supabaseUrl.includes('placeholder') && !supabaseKey.includes('placeholder');
-
-    if (hasSupabaseKeys) {
-      try {
-        setIsRealSupabase(true);
-        const supabase = createClient();
-        const { data, error } = await supabase
-          .from('invoices')
-          .select('*')
-          .order('uploaded_at', { ascending: false });
-
-        if (!error && data) {
-          setInvoices(data);
-        } else {
-          console.warn("Supabase load error, running fallback:", error);
-          loadFallbackData();
-        }
-      } catch (err) {
-        console.error("Supabase connection failed, using offline fallback:", err);
-        loadFallbackData();
-      } finally {
-        setLoading(false);
+      if (!error && data) {
+        setInvoices(data);
       }
-    } else {
-      loadFallbackData();
+    } catch (err) {
+      console.error("Supabase connection failed:", err);
+    } finally {
       setLoading(false);
     }
   };
 
-  const loadFallbackData = () => {
-    // Falls back to Express CRM cache endpoints OR global window mock invoices list
-    if (typeof (window as any).memoryInvoicesStore !== 'undefined') {
-      setInvoices((window as any).memoryInvoicesStore);
-    } else {
-      setInvoices(initialInvoices);
-    }
-  };
-
-  // Sync state from query parameters on component load and whenever URL pops/updates
   const syncParamsFromURL = () => {
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
@@ -79,7 +48,7 @@ export default function InvoicesPage() {
       const batchParam = searchParams.get('batch');
       if (batchParam) {
         setBatchFilter('batch');
-        setSearch(batchParam); // filter by batchId
+        setSearch(batchParam);
       }
     }
   };
@@ -115,7 +84,6 @@ export default function InvoicesPage() {
       const newRelativePathQuery = window.location.pathname + '?' + params.toString();
       window.history.pushState({}, '', newRelativePathQuery);
       
-      // Update local state for reactive display immediately
       setSearch(newFilters.search);
       setStatus(newFilters.status);
       setFromDate(newFilters.fromDate);
@@ -131,12 +99,10 @@ export default function InvoicesPage() {
     }
   };
 
-  // Compute filtered dataset
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
       const query = search.trim().toLowerCase();
       
-      // Match query inside invoice number, carrier, OR batch ID
       const matchSearch = !query || 
         inv.invoice_number.toLowerCase().includes(query) || 
         inv.carrier_name.toLowerCase().includes(query) ||
@@ -159,34 +125,23 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-6 animate-fade-in" id="invoices-page-root">
       
-      {/* Usage Limit Banner (Part 8) at Top of page */}
       <UsageLimitBanner />
 
-      {/* PageHeader section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-black text-white font-display tracking-tight uppercase">
+            <h1 className="text-xl font-semibold text-gray-900">
               Invoices
             </h1>
-            {isRealSupabase ? (
-              <span className="flex items-center gap-1 text-[10px] font-bold text-[#10B981] bg-[#10B981]/15 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-mono">
-                <ShieldCheck size={11} /> Live Secure Database
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-[10px] font-bold text-[#2DD4BF] bg-teal-500/10 border border-teal-500/20 px-2.5 py-0.5 rounded-full font-mono">
-                <CloudLightning size={11} /> Sandbox Memory
-              </span>
-            )}
           </div>
-          <p className="text-xs text-[#94A3B8]" id="invoice-total-count-subtitle">
-            Showing {filteredInvoices.length} of {invoices.length} total freight bills ledgered for compliance.
+          <p className="text-sm text-gray-500" id="invoice-total-count-subtitle">
+            Showing {filteredInvoices.length} of {invoices.length} total freight bills.
           </p>
         </div>
 
         <button
           onClick={handleNavigateToUpload}
-          className="py-2.5 px-4 bg-[#2DD4BF] hover:bg-[#14B8A4] text-black font-extrabold rounded-lg text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(45,212,191,0.3)] hover:shadow-[0_0_25px_rgba(45,212,191,0.45)] flex items-center gap-2 cursor-pointer font-mono"
+          className="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold text-sm px-4 py-2 rounded-xl transition-colors duration-150 inline-flex items-center gap-2 cursor-pointer"
           id="invoice-header-upload-btn"
         >
           <Upload size={14} />
@@ -194,7 +149,6 @@ export default function InvoicesPage() {
         </button>
       </div>
 
-      {/* Filter Options toolbar */}
       <FilterBar
         initialSearch={search}
         initialStatus={status}
@@ -203,29 +157,27 @@ export default function InvoicesPage() {
         onFilterChange={handleFilterChange}
       />
 
-      {/* All | Single | Batch filter tabs (Part 7) */}
-      <div className="flex border-b border-[#1F2D45] w-full gap-5 font-mono text-[10px] tracking-widest font-black uppercase pb-0">
+      <div className="flex gap-5 font-mono text-xs font-semibold uppercase tracking-wider pb-0 border-b border-gray-100">
         <button 
           onClick={() => setBatchFilter('all')}
-          className={`pb-3 px-1.5 transition-all outline-none cursor-pointer ${batchFilter === 'all' ? 'text-[#2DD4BF] border-b-2 border-[#2DD4BF]' : 'text-slate-500 hover:text-slate-300'}`}
+          className={`pb-3 px-1 transition-all outline-none cursor-pointer ${batchFilter === 'all' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
         >
           All Uploads
         </button>
         <button 
           onClick={() => setBatchFilter('single')}
-          className={`pb-3 px-1.5 transition-all outline-none cursor-pointer ${batchFilter === 'single' ? 'text-[#2DD4BF] border-b-2 border-[#2DD4BF]' : 'text-slate-500 hover:text-slate-300'}`}
+          className={`pb-3 px-1 transition-all outline-none cursor-pointer ${batchFilter === 'single' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
         >
           Single Files
         </button>
         <button 
           onClick={() => setBatchFilter('batch')}
-          className={`pb-3 px-1.5 transition-all outline-none cursor-pointer ${batchFilter === 'batch' ? 'text-[#2DD4BF] border-b-2 border-[#2DD4BF]' : 'text-slate-500 hover:text-slate-300'}`}
+          className={`pb-3 px-1 transition-all outline-none cursor-pointer ${batchFilter === 'batch' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
         >
           Batch Packs
         </button>
       </div>
 
-      {/* Data visualizer */}
       {loading ? (
         <DataTable data={[]} loading={true} />
       ) : invoices.length === 0 ? (

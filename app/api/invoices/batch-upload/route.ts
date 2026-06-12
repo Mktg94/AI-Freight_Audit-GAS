@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createRequire } from 'module';
 import { detectMultipleInvoices, splitMultiInvoicePDF } from '@/lib/ai/invoiceSplitter';
 import { extractInvoiceData } from '@/lib/ai/extractInvoice';
-import { auditLineItems } from '@/lib/ai/auditInvoice';
+import { auditInvoice } from '@/lib/ai/auditInvoice';
 import { checkInvoiceLimit, incrementInvoiceCount } from '@/lib/auth/planLimits';
 
 const require = createRequire(import.meta.url);
@@ -28,16 +28,24 @@ export async function POST(request: Request) {
     const supabase = createClient();
     
     // Auth detection
-    let userId = 'user-atlas-mock';
-    let orgId = 'org-101-auth-alpha';
-    let orgLimit = 100;
-    let orgUsed = 3;
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = user.id;
+    let orgId = '';
     let limitData: any = null;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        userId = user.id;
+      const { data: orgDetail } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('owner_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (orgDetail) {
+        orgId = orgDetail.id;
         const { data: orgDetail } = await supabase
           .from('organizations')
           .select('*')
@@ -52,8 +60,11 @@ export async function POST(request: Request) {
           limitData = orgDetail;
         }
       }
+      }
     } catch {
-      console.warn("Using sandbox offline authentication credentials.");
+      if (!orgId) {
+        return NextResponse.json({ error: "Organization not found" }, { status: 404 });
+      }
     }
 
     // Step 3: Check invoice_limit_per_month limit
@@ -99,12 +110,6 @@ export async function POST(request: Request) {
       };
     }
 
-    // Add to Express global cache if present
-    if (typeof (global as any).memoryInvoiceBatchesStore === 'undefined') {
-      (global as any).memoryInvoiceBatchesStore = [];
-    }
-    (global as any).memoryInvoiceBatchesStore.push(insertedBatch);
-
     // Fetch the active comparisons sheet contract to avoid repetitive fetching
     let selectedContract: any = null;
     try {
@@ -119,21 +124,7 @@ export async function POST(request: Request) {
     }
 
     if (!selectedContract) {
-      selectedContract = {
-        id: contractId,
-        org_id: orgId,
-        carrier_name: "FedEx Freight",
-        base_rate_per_lb: 0.12,
-        base_rate_per_mile: 1.5,
-        minimum_charge: 120,
-        fuel_surcharge_pct: 0.14,
-        residential_surcharge: 75,
-        liftgate_fee: 65,
-        detention_rate_per_hr: 50,
-        inside_delivery_fee: 90,
-        redelivery_fee: 50,
-        created_at: new Date().toISOString()
-      };
+      return NextResponse.json({ error: "Contract not found" }, { status: 404 });
     }
 
     // Step 5: Process files
@@ -176,7 +167,7 @@ export async function POST(request: Request) {
         pageCount = parsedPdf.numpages || 1;
         pdfText = parsedPdf.text || "";
       } catch {
-        pdfText = `FedEx Freight invoice number FDX-${Date.now()}. Weight 3000 lbs. Distance 450 miles. Base charge $1200.00`;
+        pdfText = '';
         pageCount = 1;
       }
 
@@ -196,8 +187,7 @@ export async function POST(request: Request) {
           fileUrl = publicUrl || fileUrl;
         }
       } catch {
-        // sandbox memory url
-        fileUrl = `https://storage.supabase.com/mock-bucket/${storagePath}`;
+        fileUrl = '#';
       }
 
       // Check for multi invoice
@@ -268,21 +258,21 @@ export async function POST(request: Request) {
         }
 
         // Run Audit
-        const auditResults = await auditLineItems(extracted.line_items, selectedContract);
+        const auditResult = await auditInvoice(extracted, JSON.stringify(selectedContract));
 
         let totalApproved = 0;
-        const lineItemInserts = auditResults.map((auditLine, idx) => {
-          totalApproved += auditLine.expected_amount;
+        const lineItemInserts = auditResult.line_items.map((auditLine, idx) => {
+          totalApproved += auditLine.expected;
           return {
             id: `li-live-${Date.now()}-${idx}`,
             invoice_id: insertedInvoice.id,
             description: auditLine.description,
-            billed_amount: auditLine.billed_amount,
-            expected_amount: auditLine.expected_amount,
-            discrepancy: auditLine.discrepancy,
-            ai_flag_reason: auditLine.discrepancy > 0 ? auditLine.flag_reason : undefined,
-            confidence_score: auditLine.confidence_score,
-            status: (auditLine.discrepancy > 0 ? 'disputed' : 'approved') as const,
+            billed_amount: auditLine.billed,
+            expected_amount: auditLine.expected,
+            discrepancy: auditLine.difference,
+            ai_flag_reason: auditLine.difference > 0 ? auditLine.reason : undefined,
+            confidence_score: auditLine.status === 'match' ? 0.95 : 0.85,
+            status: (auditLine.difference > 0 ? 'disputed' : 'approved') as const,
             created_at: new Date().toISOString()
           };
         });
@@ -332,12 +322,6 @@ export async function POST(request: Request) {
 
         processedInvoiceIds.push(insertedInvoice.id);
         
-        // Add to Node global storage
-        if (typeof (global as any).memoryInvoicesStore !== 'undefined') {
-          (global as any).memoryInvoicesStore.unshift(insertedInvoice);
-          (global as any).memoryLineItemsStore = [...lineItemInserts, ...(global as any).memoryLineItemsStore];
-        }
-
         completedInvoiceCount++;
         insertedBatch.completed_count = completedInvoiceCount;
         try {

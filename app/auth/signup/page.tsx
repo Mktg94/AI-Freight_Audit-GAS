@@ -21,7 +21,6 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
   const [useMock, setUseMock] = useState(false);
 
   useEffect(() => {
-    // Determine if Supabase configuration is present
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
     
@@ -34,7 +33,6 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
     e.preventDefault();
     setErrorMsg('');
 
-    // Field-level client validations
     if (!companyName.trim()) {
       setErrorMsg('Company Name is required');
       return;
@@ -60,7 +58,6 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
 
     try {
       if (useMock) {
-        // Safe simulator mode for sandbox environment preview
         await new Promise(resolve => setTimeout(resolve, 1500));
         
         const mockUser = {
@@ -77,17 +74,14 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
         if (onSignupSuccess) {
           onSignupSuccess(mockSession, companyName);
         } else {
-          // Trigger local cookie or storage variable then redirect
           window.history.pushState({}, '', '/dashboard');
           window.dispatchEvent(new Event('popstate'));
         }
         return;
       }
 
-      // Real Supabase Auth Execution
       const supabase = createClient();
       
-      // 1. Sing up the user using Supabase
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -107,7 +101,6 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
         throw new Error('No user data returned from Auth gateway.');
       }
 
-      // 2. Insert corresponding organization row
       const { error: orgError } = await supabase
         .from('organizations')
         .insert([
@@ -119,10 +112,8 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
 
       if (orgError) {
         console.error('Failed to create company entry, but auth occurred:', orgError);
-        // Continue but alert details
       }
 
-      // Create a temporary mock session or direct logins
       if (onSignupSuccess) {
         onSignupSuccess(data, companyName);
       } else {
@@ -139,42 +130,36 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E] flex flex-col items-center justify-center p-6 relative overflow-hidden" id="auth-signup-screen">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 relative" id="auth-signup-screen">
       
-      {/* Decorative subtle background radial glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-teal-500/5 blur-[100px] rounded-full pointer-events-none" />
-
-      <div className="w-full max-w-md bg-[#111827] border border-teal-900/40 rounded-xl p-8 relative z-10 shadow-[0_4px_30px_rgba(0,0,0,0.4)]">
+      <div className="w-full max-w-md bg-white border border-gray-100 rounded-2xl p-8 relative z-10 shadow-sm">
         
-        {/* Header brand details */}
         <div className="flex flex-col items-center text-center space-y-3 mb-6">
-          <div className="h-12 w-12 rounded-xl bg-gradient-to-tr from-teal-500 to-teal-400 p-0.5 flex items-center justify-center shadow-[0_0_20px_rgba(45,212,191,0.25)]">
-            <div className="h-full w-full bg-[#111827] rounded-[10px] flex items-center justify-center">
-              <ShieldCheck className="text-[#2DD4BF] h-6 w-6" />
-            </div>
+          <div className="h-12 w-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+            <ShieldCheck className="text-indigo-600 h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-[#2DD4BF] font-display">
-              FreightAudit <span className="text-white">AI</span>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+              FreightAudit <span className="text-indigo-600">AI</span>
             </h1>
-            <p className="text-[10px] text-[#2DD4BF] font-mono tracking-widest uppercase mt-0.5 font-bold">
+            <p className="text-[10px] text-indigo-600 font-mono tracking-widest uppercase mt-0.5 font-semibold">
               Automated Billing Protection
             </p>
           </div>
-          <h2 className="text-lg font-medium text-white tracking-tight mt-3 font-display">
+          <h2 className="text-lg font-semibold text-gray-900 tracking-tight mt-3">
             Create Free Account
           </h2>
-          <p className="text-xs text-[#94A3B8]">
+          <p className="text-sm text-gray-500">
             Begin protecting your logistical margins and auditing freight invoices
           </p>
         </div>
 
         {useMock && (
-          <div className="mb-6 p-3 bg-teal-500/10 border border-teal-500/20 rounded-lg text-left">
-            <div className="flex items-center gap-1.5 text-[#2DD4BF] font-bold text-[10px] uppercase tracking-wider mb-1">
+          <div className="mb-6 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-left">
+            <div className="flex items-center gap-1.5 text-indigo-600 font-semibold text-[10px] uppercase tracking-wider mb-1">
               <Sparkles size={12} /> Sandbox Interactive Mode
             </div>
-            <p className="text-[10px] text-zinc-400 leading-normal">
+            <p className="text-[10px] text-gray-500 leading-normal">
               Running without active cloud secrets. Fill out the form, and click Register. Simulation will automatically set up your local workspace environment.
             </p>
           </div>
@@ -182,13 +167,12 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
 
         <form onSubmit={handleSignUpHandler} className="space-y-4">
           
-          {/* Company Name */}
           <div className="space-y-1">
-            <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider">
+            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
               Company / Organization Name
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-500">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
                 <Building size={14} />
               </span>
               <input
@@ -197,18 +181,17 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="e.g. Atlas Global Logistics"
-                className="w-full pl-9 pr-4 py-2 bg-[#0A0F1E] text-[#F1F5F9] border border-[#1F2D45] rounded-lg focus:outline-none focus:border-[#2DD4BF] focus:ring-1 focus:ring-[#2DD4BF] placeholder-[#475569] text-xs transition-colors shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/20 placeholder-gray-400 text-xs transition-colors"
               />
             </div>
           </div>
 
-          {/* Your Name */}
           <div className="space-y-1">
-            <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider">
+            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
               Your Full Name
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-500">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
                 <User size={14} />
               </span>
               <input
@@ -217,18 +200,17 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
                 value={yourName}
                 onChange={(e) => setYourName(e.target.value)}
                 placeholder="e.g. John Doe"
-                className="w-full pl-9 pr-4 py-2 bg-[#0A0F1E] text-[#F1F5F9] border border-[#1F2D45] rounded-lg focus:outline-none focus:border-[#2DD4BF] focus:ring-1 focus:ring-[#2DD4BF] placeholder-[#475569] text-xs transition-colors shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/20 placeholder-gray-400 text-xs transition-colors"
               />
             </div>
           </div>
 
-          {/* Email Address */}
           <div className="space-y-1">
-            <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider">
+            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
               Work Email Address
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-500">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
                 <Mail size={14} />
               </span>
               <input
@@ -237,18 +219,17 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
-                className="w-full pl-9 pr-4 py-2 bg-[#0A0F1E] text-[#F1F5F9] border border-[#1F2D45] rounded-lg focus:outline-none focus:border-[#2DD4BF] focus:ring-1 focus:ring-[#2DD4BF] placeholder-[#475569] text-xs transition-colors shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/20 placeholder-gray-400 text-xs transition-colors"
               />
             </div>
           </div>
 
-          {/* Password (min 8) */}
           <div className="space-y-1">
-            <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider">
+            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
               Secure Password (min 8 characters)
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-500">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
                 <Lock size={14} />
               </span>
               <input
@@ -258,18 +239,17 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password (minimum 8 chars)"
-                className="w-full pl-9 pr-4 py-2 bg-[#0A0F1E] text-[#F1F5F9] border border-[#1F2D45] rounded-lg focus:outline-none focus:border-[#2DD4BF] focus:ring-1 focus:ring-[#2DD4BF] placeholder-[#475569] text-xs transition-colors shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/20 placeholder-gray-400 text-xs transition-colors"
               />
             </div>
           </div>
 
-          {/* Confirm Password */}
           <div className="space-y-1">
-            <label className="block text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider">
+            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
               Confirm Password
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-500">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
                 <Lock size={14} />
               </span>
               <input
@@ -279,16 +259,15 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Retype password"
-                className="w-full pl-9 pr-4 py-2 bg-[#0A0F1E] text-[#F1F5F9] border border-[#1F2D45] rounded-lg focus:outline-none focus:border-[#2DD4BF] focus:ring-1 focus:ring-[#2DD4BF] placeholder-[#475569] text-xs transition-colors shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/20 placeholder-gray-400 text-xs transition-colors"
               />
             </div>
           </div>
 
-          {/* Create Button */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 bg-[#2DD4BF] hover:bg-[#14B8A4] disabled:opacity-50 text-black font-semibold rounded-lg text-xs tracking-wide uppercase transition-all shadow-[0_0_20px_rgba(45,212,191,0.2)] hover:shadow-[0_0_25px_rgba(45,212,191,0.35)] flex items-center justify-center gap-2 cursor-pointer mt-4"
+            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold rounded-xl text-xs tracking-wide uppercase transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer mt-4"
           >
             {loading ? (
               <>
@@ -300,24 +279,22 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
             )}
           </button>
 
-          {/* Error Message Box */}
           {errorMsg && (
-            <div className="p-2.5 bg-red-500/10 border border-red-500/30 rounded-lg text-center mt-2">
-              <p className="text-[10px] text-red-400 font-semibold leading-normal">{errorMsg}</p>
+            <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-center mt-2">
+              <p className="text-[10px] text-red-600 font-medium leading-normal">{errorMsg}</p>
             </div>
           )}
         </form>
 
-        {/* Existing account link */}
-        <div className="mt-6 text-center text-xs">
-          <span className="text-[#94A3B8] font-medium">Already have an account? </span>
+        <div className="mt-6 text-center text-sm">
+          <span className="text-gray-400 font-medium">Already have an account? </span>
           <button
             type="button"
             onClick={onNavigateToLogin ? onNavigateToLogin : () => {
               window.history.pushState({}, '', '/auth/login');
               window.dispatchEvent(new Event('popstate'));
             }}
-            className="text-[#2DD4BF] font-semibold hover:underline bg-transparent border-none cursor-pointer"
+            className="text-indigo-600 font-semibold hover:underline bg-transparent border-none cursor-pointer"
           >
             Sign in
           </button>
@@ -325,7 +302,7 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
 
       </div>
 
-      <p className="text-[10px] text-zinc-600 mt-6 font-mono tracking-wider">
+      <p className="text-[10px] text-gray-400 mt-6 font-mono tracking-wider">
         FreightAudit AI &bull; Secure AES Encryption &bull; v1.4.0
       </p>
     </div>
