@@ -122,18 +122,9 @@ export default function InvoiceUploadPage() {
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Not authenticated');
-        const { data: newOrg, error: createErr } = await supabase
-          .from('organizations')
-          .insert({ name: 'My Organization', owner_id: user.id })
-          .select()
-          .single();
-        if (createErr || !newOrg) {
-          const setupRes = await fetch('/api/debug/setup-org');
-          const setupData = await setupRes.json();
-          if (setupData.orgId) resolvedOrgId = setupData.orgId;
-        } else {
-          resolvedOrgId = newOrg.id;
-        }
+        const setupRes = await fetch(`/api/debug/setup-org?userId=${user.id}`);
+        const setupData = await setupRes.json();
+        if (setupData.orgId) resolvedOrgId = setupData.orgId;
       }
 
       if (!resolvedOrgId) {

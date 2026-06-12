@@ -457,18 +457,24 @@ app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, 
 app.get("/api/debug/setup-org", async (req, res) => {
   try {
     const admin = getSupabaseAdmin();
-    const { data: { users }, error: listErr } = await admin.auth.admin.listUsers();
-    if (listErr) throw listErr;
-    const firstUser = users?.[0];
-    if (!firstUser) throw new Error("No auth users found");
+    const userId = req.query.userId as string;
 
-    const { data: existingOrgs } = await admin
+    if (!userId) {
+      const { data: { users }, error: listErr } = await admin.auth.admin.listUsers();
+      if (listErr) throw listErr;
+      const firstUser = users?.[0];
+      if (!firstUser) throw new Error("No auth users found. Pass ?userId= as query param.");
+      return res.redirect(`/api/debug/setup-org?userId=${firstUser.id}`);
+    }
+
+    const { data: existingForUser } = await admin
       .from("organizations")
-      .select("id, owner_id")
-      .eq("owner_id", firstUser.id);
+      .select("id")
+      .eq("owner_id", userId)
+      .limit(1);
 
-    if (existingOrgs && existingOrgs.length > 0) {
-      return res.json({ orgId: existingOrgs[0].id, message: "Org already exists for this user" });
+    if (existingForUser && existingForUser.length > 0) {
+      return res.json({ orgId: existingForUser[0].id, message: "Org already exists for this user" });
     }
 
     const { data: anyOrg } = await admin
@@ -478,17 +484,13 @@ app.get("/api/debug/setup-org", async (req, res) => {
       .maybeSingle();
 
     if (anyOrg) {
-      const { error: updateErr } = await admin
-        .from("organizations")
-        .update({ owner_id: firstUser.id })
-        .eq("id", anyOrg.id);
-      if (updateErr) throw updateErr;
-      return res.json({ orgId: anyOrg.id, message: "Updated existing org owner to your user" });
+      await admin.from("organizations").update({ owner_id: userId }).eq("id", anyOrg.id);
+      return res.json({ orgId: anyOrg.id, message: "Updated existing org owner to your user ID" });
     }
 
     const { data: newOrg, error: createErr } = await admin
       .from("organizations")
-      .insert({ name: "My Organization", owner_id: firstUser.id })
+      .insert({ name: "My Organization", owner_id: userId })
       .select()
       .single();
     if (createErr) throw createErr;
