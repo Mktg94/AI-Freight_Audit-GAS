@@ -24,6 +24,7 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
   const [approvingClean, setApprovingClean] = useState(false);
   const [generatingDispute, setGeneratingDispute] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [approvingInvoice, setApprovingInvoice] = useState(false);
 
   const fetchInvoiceData = async () => {
     if (!resolvedId || resolvedId === 'invoices') return;
@@ -143,6 +144,27 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
     }
   };
 
+  const handleApproveInvoice = async () => {
+    if (!resolvedId) return;
+    setApprovingInvoice(true);
+    try {
+      const res = await fetch(`/api/invoices/${resolvedId}/approve`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Approve failed');
+      await fetchInvoiceData();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('invoices-updated'));
+        window.dispatchEvent(new CustomEvent('show-toast', {
+          detail: { title: 'Invoice Approved', message: `Saved $${(data.data?.total_savings || 0).toFixed(2)}` }
+        }));
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    } finally {
+      setApprovingInvoice(false);
+    }
+  };
+
   const handleNavigateBack = (e: React.MouseEvent) => {
     e.preventDefault();
     if (onBack) {
@@ -245,6 +267,22 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
                 <Sparkles size={14} />
               )}
               <span>{invoice.status === 'disputed' ? 'Dispute Issued' : 'Generate Dispute'}</span>
+            </button>
+          )}
+
+          {invoice.status === 'flagged' && (
+            <button
+              onClick={handleApproveInvoice}
+              disabled={approvingInvoice}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              id="approve-invoice-action"
+            >
+              {approvingInvoice ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <CheckCheck size={14} />
+              )}
+              <span>Approve Invoice</span>
             </button>
           )}
 

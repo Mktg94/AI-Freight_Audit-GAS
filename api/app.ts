@@ -336,6 +336,7 @@ app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, 
     const supabase = getSupabaseAdmin();
     const files = req.files as Express.Multer.File[];
     const contract_id = req.body.contract_id;
+    const user_id = req.body.user_id;
     let org_id = req.body.org_id;
 
     if (!files || files.length === 0) {
@@ -345,12 +346,40 @@ app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, 
       return res.status(400).json({ error: "Missing contract id" });
     }
     if (!org_id) {
-      const { data: org } = await supabase
-        .from("organizations")
-        .select("id")
-        .limit(1)
-        .single();
-      org_id = org?.id ?? await ensureDefaultOrg(supabase);
+      if (user_id) {
+        const { data: userOrgs } = await supabase
+          .from("organizations")
+          .select("id")
+          .eq("owner_id", user_id)
+          .limit(1);
+        if (userOrgs && userOrgs.length > 0) {
+          org_id = userOrgs[0].id;
+        } else {
+          const { data: anyOrg } = await supabase
+            .from("organizations")
+            .select("id")
+            .limit(1)
+            .maybeSingle();
+          if (anyOrg) {
+            await supabase.from("organizations").update({ owner_id: user_id }).eq("id", anyOrg.id);
+            org_id = anyOrg.id;
+          } else {
+            const { data: newOrg } = await supabase
+              .from("organizations")
+              .insert({ name: "My Organization", owner_id: user_id })
+              .select()
+              .single();
+            org_id = newOrg?.id || null;
+          }
+        }
+      } else {
+        const { data: org } = await supabase
+          .from("organizations")
+          .select("id")
+          .limit(1)
+          .single();
+        org_id = org?.id ?? await ensureDefaultOrg(supabase);
+      }
     }
     if (!org_id) {
       return res.status(400).json({ error: "No organization found." });
@@ -411,7 +440,7 @@ app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, 
             weight_lbs: extractedInvoice.weight_lbs || 0,
             distance_miles: extractedInvoice.distance_miles || 0,
             extracted_data: extractedInvoice,
-            status: "pending",
+            status: "auditing",
             total_billed: extractedInvoice.total_billed || 0,
             total_approved: 0,
             total_savings: 0,
@@ -424,6 +453,57 @@ app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, 
         if (invoiceError) {
           console.warn("Invoice creation failed, skipping:", invoiceError.message);
           continue;
+        }
+
+        // Run audit against contract
+        try {
+          const { data: contractData } = await supabase
+            .from("contracts")
+            .select("*")
+            .eq("id", contract_id)
+            .single();
+
+          if (contractData && extractedInvoice.line_items && extractedInvoice.line_items.length > 0) {
+            const auditResults = await auditLineItems(extractedInvoice.line_items, contractData);
+
+            let totalApproved = 0;
+            const lineItemInserts = auditResults.map((item, idx) => {
+              totalApproved += item.expected_amount;
+              return {
+                invoice_id: invoice.id,
+                description: item.description,
+                billed_amount: item.billed_amount,
+                expected_amount: item.expected_amount,
+                discrepancy: item.discrepancy,
+                ai_flag_reason: item.flag_reason || null,
+                confidence_score: item.confidence_score,
+                status: item.status === "overcharged" || item.status === "suspicious" || item.status === "not_in_contract" ? "disputed" : "approved",
+                created_at: new Date().toISOString(),
+              };
+            });
+
+            await supabase.from("line_items").insert(lineItemInserts);
+
+            const totalSavings = Math.max(0, (extractedInvoice.total_billed || 0) - totalApproved);
+            const finalStatus = totalSavings > 0 ? "flagged" : "approved";
+
+            await supabase
+              .from("invoices")
+              .update({
+                status: finalStatus,
+                total_approved: totalApproved,
+                total_savings: totalSavings,
+                audited_at: new Date().toISOString(),
+              })
+              .eq("id", invoice.id);
+          } else {
+            await supabase
+              .from("invoices")
+              .update({ status: "pending" })
+              .eq("id", invoice.id);
+          }
+        } catch (auditErr: any) {
+          console.warn(`Audit failed for ${file.originalname}:`, auditErr.message);
         }
 
         invoiceIds.push(invoice.id);
@@ -608,13 +688,17 @@ app.patch("/api/line-items/:id", express.json(), async (req, res) => {
       return res.status(400).json({ error: "Invalid status" });
     }
 
+    const updatePayload: any = {
+      status,
+      reviewed_at: new Date().toISOString(),
+    };
+    if (req.body.user_id) {
+      updatePayload.reviewed_by = req.body.user_id;
+    }
+
     const { data: updatedItem, error: updateError } = await supabase
       .from("line_items")
-      .update({
-        status,
-        reviewed_by: req.body.user_id || "system",
-        reviewed_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", id)
       .select()
       .single();
@@ -638,11 +722,9 @@ app.patch("/api/line-items/:id", express.json(), async (req, res) => {
       }
     });
 
-    const hasDisputed = (siblings || []).some((l: any) => l.status === "disputed");
-    const hasFlags = (siblings || []).some((l: any) => l.status === "disputed" || Number(l.discrepancy) > 0);
-    let finalStatus = "approved";
-    if (hasDisputed) finalStatus = "disputed";
-    else if (hasFlags) finalStatus = "flagged";
+    const hasDisputedItems = (siblings || []).some((l: any) => l.status === "disputed");
+    const hasFlaggedItems = (siblings || []).some((l: any) => l.status === "disputed" || Number(l.discrepancy) > 0);
+    const finalStatus = hasFlaggedItems ? "flagged" : "approved";
 
     await supabase
       .from("invoices")
@@ -654,7 +736,13 @@ app.patch("/api/line-items/:id", express.json(), async (req, res) => {
       })
       .eq("id", invoiceId);
 
-    res.json({ success: true, lineItem: updatedItem });
+    const { data: freshInvoice } = await supabase
+      .from("invoices")
+      .select("*")
+      .eq("id", invoiceId)
+      .single();
+
+    res.json({ success: true, lineItem: updatedItem, invoice: freshInvoice });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to update line item", details: err.message });
   }
@@ -675,13 +763,15 @@ app.post("/api/invoices/:id/approve-clean", async (req, res) => {
 
     const cleanIds = (cleanItems || []).map((item: any) => item.id);
     if (cleanIds.length > 0) {
+      const updateBody: any = {
+        status: "approved",
+        reviewed_at: new Date().toISOString(),
+      };
+      if (req.body.user_id) updateBody.reviewed_by = req.body.user_id;
+
       const { error: updateError } = await supabase
         .from("line_items")
-        .update({
-          status: "approved",
-          reviewed_by: req.body.user_id || "system",
-          reviewed_at: new Date().toISOString(),
-        })
+        .update(updateBody)
         .in("id", cleanIds);
       if (updateError) throw updateError;
     }
@@ -703,11 +793,8 @@ app.post("/api/invoices/:id/approve-clean", async (req, res) => {
       }
     });
 
-    const hasDisputed = (siblings || []).some((l: any) => l.status === "disputed");
-    const hasFlags = (siblings || []).some((l: any) => l.status === "disputed" || Number(l.discrepancy) > 0);
-    let finalStatus = "approved";
-    if (hasDisputed) finalStatus = "disputed";
-    else if (hasFlags) finalStatus = "flagged";
+    const hasFlaggedItems = (siblings || []).some((l: any) => l.status === "disputed" || Number(l.discrepancy) > 0);
+    const finalStatus = hasFlaggedItems ? "flagged" : "approved";
 
     await supabase
       .from("invoices")
@@ -719,7 +806,13 @@ app.post("/api/invoices/:id/approve-clean", async (req, res) => {
       })
       .eq("id", id);
 
-    res.json({ success: true, approvedCount: cleanIds.length });
+    const { data: refreshedInvoice } = await supabase
+      .from("invoices")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    res.json({ success: true, approvedCount: cleanIds.length, invoice: refreshedInvoice });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to approve clean items", details: err.message });
   }
@@ -889,21 +982,51 @@ app.post("/api/audit", async (req, res) => {
   }
 });
 
-let memoryDisputes: any[] = [];
+app.get("/api/disputes/:id", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { id } = req.params;
+    const { data: dispute, error } = await supabase
+      .from("disputes")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error || !dispute) return res.status(404).json({ error: "Dispute not found" });
 
-app.get("/api/disputes/:id", (req, res) => {
-  const { id } = req.params;
-  const dispute = memoryDisputes.find((d) => d.id === id);
-  if (!dispute) return res.status(404).json({ error: "Dispute not found" });
-  res.json({ success: true, dispute });
+    const { data: invoice } = await supabase
+      .from("invoices")
+      .select("*")
+      .eq("id", dispute.invoice_id)
+      .single();
+
+    const { data: lineItems } = await supabase
+      .from("line_items")
+      .select("*")
+      .eq("invoice_id", dispute.invoice_id)
+      .eq("status", "disputed");
+
+    res.json({ success: true, dispute, invoice: invoice || null, lineItems: lineItems || [] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.patch("/api/disputes/:id", (req, res) => {
-  const { id } = req.params;
-  const idx = memoryDisputes.findIndex((d) => d.id === id);
-  if (idx === -1) return res.status(404).json({ error: "Dispute not found" });
-  memoryDisputes[idx] = { ...memoryDisputes[idx], ...req.body };
-  res.json({ success: true, data: memoryDisputes[idx] });
+app.patch("/api/disputes/:id", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { id } = req.params;
+    const { data, error } = await supabase
+      .from("disputes")
+      .update(req.body)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "Dispute not found" });
+    res.json({ success: true, data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post("/api/disputes/create", async (req, res) => {
@@ -918,6 +1041,16 @@ app.post("/api/disputes/create", async (req, res) => {
       .single();
     if (invError || !invoice) {
       return res.status(404).json({ error: "Invoice not found" });
+    }
+
+    const { data: existing } = await supabase
+      .from("disputes")
+      .select("*")
+      .eq("invoice_id", invoice_id)
+      .neq("status", "rejected")
+      .limit(1);
+    if (existing && existing.length > 0) {
+      return res.json({ success: true, data: existing[0], disputeId: existing[0].id, reused: true });
     }
 
     const { data: lineItems } = await supabase
@@ -950,32 +1083,153 @@ app.post("/api/disputes/create", async (req, res) => {
       totalDisputed,
     });
 
-    const dispute: any = {
-      id: `disp-${Date.now()}`,
-      invoice_id,
-      org_id: invoice.org_id,
-      carrier_name: invoice.carrier_name,
-      carrier_email: req.body.carrier_email || "",
-      dispute_letter_text: disputeLetter,
-      total_disputed_amount: totalDisputed,
-      status: "draft",
-      created_at: new Date().toISOString(),
-    };
+    const { data: newDispute, error: insertErr } = await supabase
+      .from("disputes")
+      .insert({
+        invoice_id,
+        org_id: invoice.org_id,
+        carrier_name: invoice.carrier_name || "",
+        carrier_email: req.body.carrier_email || "",
+        dispute_letter_text: disputeLetter,
+        total_disputed_amount: totalDisputed,
+        status: "draft",
+      })
+      .select()
+      .single();
 
-    memoryDisputes.unshift(dispute);
-    res.json({ success: true, data: dispute, disputeId: dispute.id });
+    if (insertErr) throw insertErr;
+
+    await supabase
+      .from("invoices")
+      .update({ status: "disputed" })
+      .eq("id", invoice_id);
+
+    res.json({ success: true, data: newDispute, disputeId: newDispute.id });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to create dispute", details: err.message });
   }
 });
 
-app.post("/api/disputes/:id/send", (req, res) => {
-  const { id } = req.params;
-  const idx = memoryDisputes.findIndex((d) => d.id === id);
-  if (idx === -1) return res.status(404).json({ error: "Dispute not found" });
-  memoryDisputes[idx].status = "sent";
-  memoryDisputes[idx].sent_at = new Date().toISOString();
-  res.json({ success: true, data: memoryDisputes[idx] });
+app.post("/api/disputes/:id/send", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { id } = req.params;
+
+    const { data: dispute, error: fetchErr } = await supabase
+      .from("disputes")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (fetchErr || !dispute) return res.status(404).json({ error: "Dispute not found" });
+
+    // Send email via Resend if API key is configured
+    const resendKey = process.env.RESEND_API_KEY;
+    if (resendKey && resendKey !== "" && resendKey !== "MY_RESEND_API_KEY" && dispute.carrier_email) {
+      try {
+        const { Resend } = await import("resend");
+        const resend = new Resend(resendKey);
+        await resend.emails.send({
+          from: "FreightAudit <onboarding@resend.dev>",
+          to: dispute.carrier_email,
+          subject: `Dispute Letter: Invoice ${dispute.invoice_id}`,
+          text: dispute.dispute_letter_text,
+        });
+      } catch (emailErr: any) {
+        console.warn("Email send failed (continuing):", emailErr.message);
+      }
+    }
+
+    const { data: updated, error: updateErr } = await supabase
+      .from("disputes")
+      .update({ status: "sent", sent_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+    if (updateErr) throw updateErr;
+
+    res.json({ success: true, data: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/disputes/:id/resolve", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { id } = req.params;
+    const resolutionAmount = Number(req.body.resolution_amount) || 0;
+
+    const { data: dispute, error: fetchErr } = await supabase
+      .from("disputes")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (fetchErr || !dispute) return res.status(404).json({ error: "Dispute not found" });
+
+    const { error: updateErr } = await supabase
+      .from("disputes")
+      .update({
+        status: "resolved",
+        resolved_at: new Date().toISOString(),
+        resolution_amount: resolutionAmount,
+      })
+      .eq("id", id);
+    if (updateErr) throw updateErr;
+
+    const { data: invoice } = await supabase
+      .from("invoices")
+      .select("*")
+      .eq("id", dispute.invoice_id)
+      .single();
+
+    if (invoice) {
+      const totalApproved = Math.max(0, (invoice.total_billed || 0) - resolutionAmount);
+      await supabase
+        .from("invoices")
+        .update({
+          status: "approved",
+          total_approved: totalApproved,
+          total_savings: resolutionAmount,
+        })
+        .eq("id", dispute.invoice_id);
+    }
+
+    res.json({ success: true, disputeId: id });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/invoices/:id/approve", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { id } = req.params;
+
+    const { data: invoice, error: fetchErr } = await supabase
+      .from("invoices")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (fetchErr || !invoice) return res.status(404).json({ error: "Invoice not found" });
+
+    const savings = Math.max(0, (invoice.total_billed || 0) - (invoice.total_approved || 0));
+
+    const { data: updated, error: updateErr } = await supabase
+      .from("invoices")
+      .update({
+        status: "approved",
+        total_savings: savings,
+        audited_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single();
+    if (updateErr) throw updateErr;
+
+    res.json({ success: true, data: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get("/api/team/members", async (req, res) => {

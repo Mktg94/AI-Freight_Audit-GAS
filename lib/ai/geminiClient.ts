@@ -5,7 +5,7 @@ const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
 export function getGeminiModel(jsonMode: boolean = true) {
   return {
     generateContent: (params: any) => genAI.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: process.env.GEMINI_MODEL_NAME || 'gemini-2.5-flash',
       contents: params.contents || params,
       config: jsonMode ? { responseMimeType: 'application/json', ...params.config } : params.config
     })
@@ -28,7 +28,7 @@ export function parseGeminiJSON<T>(responseText: string): T {
 
 export async function generateGeminiContent(prompt: string, jsonMode: boolean = true): Promise<string> {
   const response = await genAI.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: process.env.GEMINI_MODEL_NAME || 'gemini-2.5-flash',
     contents: prompt,
     config: jsonMode ? { responseMimeType: 'application/json' } : undefined
   })

@@ -47,6 +47,19 @@ export default function DisputesPage() {
 
   useEffect(() => {
     fetchDisputes();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') fetchDisputes();
+    };
+    const handleFocus = () => fetchDisputes();
+    const handleCustom = () => fetchDisputes();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('invoices-updated', handleCustom);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('invoices-updated', handleCustom);
+    };
   }, []);
 
   const stats = useMemo(() => {

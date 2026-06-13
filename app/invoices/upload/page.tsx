@@ -26,7 +26,6 @@ export default function InvoiceUploadPage() {
   const [checkingMulti, setCheckingMulti] = useState(false);
 
   const [currentBatchId, setCurrentBatchId] = useState<string | null>(null);
-  const [orgId, setOrgId] = useState<string>('');
   const [refreshBanner, setRefreshBanner] = useState(0);
 
   useEffect(() => {
@@ -37,12 +36,6 @@ export default function InvoiceUploadPage() {
           .from('contracts')
           .select('*')
           .order('carrier_name', { ascending: true });
-
-        const { data: org } = await supabase
-          .from('organizations')
-          .select('id')
-          .single();
-        if (org) setOrgId(org.id);
 
         if (!error && data && data.length > 0) {
           setContracts(data);
@@ -109,34 +102,16 @@ export default function InvoiceUploadPage() {
     setUploadError(null);
 
     try {
-      let resolvedOrgId = orgId;
-
-      try {
-        const supabase = createClient();
-        const { data: currentOrg } = await supabase
-          .from('organizations')
-          .select('id')
-          .single();
-        if (currentOrg?.id) resolvedOrgId = currentOrg.id;
-      } catch {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Not authenticated');
-        const setupRes = await fetch(`/api/debug/setup-org?userId=${user.id}`);
-        const setupData = await setupRes.json();
-        if (setupData.orgId) resolvedOrgId = setupData.orgId;
-      }
-
-      if (!resolvedOrgId) {
-        throw new Error('Could not resolve organization. Please contact support.');
-      }
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || '';
 
       const formData = new FormData();
       selectedFiles.forEach((file) => {
         formData.append('files', file);
       });
       formData.append('contract_id', selectedContractId);
-      if (resolvedOrgId) formData.append('org_id', resolvedOrgId);
+      if (userId) formData.append('user_id', userId);
 
       const res = await fetch('/api/invoices/batch-upload', {
         method: 'POST',

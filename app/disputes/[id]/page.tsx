@@ -27,6 +27,8 @@ export default function DisputeDetailPage({ disputeId: propDisputeId, onBack }: 
   const [carrierEmail, setCarrierEmail] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [resolutionAmount, setResolutionAmount] = useState<number>(0);
+  const [isResolving, setIsResolving] = useState(false);
 
   useEffect(() => {
     if (propDisputeId) {
@@ -143,6 +145,25 @@ export default function DisputeDetailPage({ disputeId: propDisputeId, onBack }: 
       triggerToast("Delivery Failure", err.message || "Failed to dispatch email claim.");
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleResolveDispute = async () => {
+    if (!disputeId) return;
+    setIsResolving(true);
+    try {
+      const res = await fetch(`/api/disputes/${disputeId}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolution_amount: resolutionAmount }),
+      });
+      if (!res.ok) throw new Error("Resolve failed");
+      await loadDisputeData();
+      triggerToast("Dispute Resolved", `Credit of $${resolutionAmount.toFixed(2)} recorded successfully.`);
+    } catch (err: any) {
+      triggerToast("Resolution Failed", err.message);
+    } finally {
+      setIsResolving(false);
     }
   };
 
@@ -396,6 +417,37 @@ export default function DisputeDetailPage({ disputeId: propDisputeId, onBack }: 
                 </button>
               </PermissionGate>
             </div>
+
+            {isSent && !isResolved && (
+              <div className="space-y-3 border-t border-gray-100 pt-4">
+                <label className="block text-[9px] font-semibold font-mono text-gray-500 uppercase tracking-wider">
+                  Resolution Amount ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={resolutionAmount || ''}
+                  onChange={(e) => setResolutionAmount(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 bg-gray-50 text-gray-900 border border-gray-200 rounded-lg text-xs font-mono focus:outline-none focus:border-green-400 transition-all"
+                  id="resolution-amount-field"
+                />
+                <button
+                  onClick={handleResolveDispute}
+                  disabled={isResolving || resolutionAmount <= 0}
+                  className="w-full py-2.5 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-[10px] font-mono uppercase tracking-wider shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                  id="resolve-dispute-action"
+                >
+                  {isResolving ? (
+                    <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={12} />
+                  )}
+                  <span>Mark Resolved & Record Refund</span>
+                </button>
+              </div>
+            )}
 
           </div>
 

@@ -62,7 +62,7 @@ Be precise with decimal numbers. Return ONLY the JSON object, nothing else.`
   const genAI = new (await import('@google/genai')).GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
 
   const result = await genAI.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: process.env.GEMINI_MODEL_NAME || 'gemini-2.5-flash',
     contents: [
       {
         inlineData: {

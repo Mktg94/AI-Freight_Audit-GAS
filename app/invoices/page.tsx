@@ -66,9 +66,27 @@ export default function InvoicesPage() {
       fetchInvoices();
     };
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchInvoices();
+      }
+    };
+
+    const handleFocus = () => {
+      fetchInvoices();
+    };
+
+    const handleCustom = () => fetchInvoices();
     window.addEventListener('popstate', handlePopstate);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('invoices-updated', handleCustom);
+
     return () => {
       window.removeEventListener('popstate', handlePopstate);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('invoices-updated', handleCustom);
     };
   }, []);
 
