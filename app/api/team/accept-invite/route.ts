@@ -81,31 +81,46 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invite has no associated email.' }, { status: 400 });
     }
 
-    // Sign up the user with the invited email
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({
+    // Create the auth user (bypasses email confirmation with service_role key)
+    let authUserId: string | null = null;
+    const { data: authData, error: createError } = await supabase.auth.admin.createUser({
       email: invite.email,
       password,
-      options: {
-        data: { full_name }
-      }
+      email_confirm: true,
+      user_metadata: { full_name }
     });
 
-    if (signUpError) {
-      if (signUpError.message.includes('already registered') || signUpError.message.includes('already exists')) {
-        return NextResponse.json({ error: 'An account with this email already exists. Please log in first, then ask the admin to re-invite you.' }, { status: 409 });
+    if (createError) {
+      if (createError.code === 'email_exists') {
+        // User already has an auth account — fetch their existing ID
+        const { data: existingUsers } = await supabase.auth.admin.listUsers();
+        const existing = existingUsers?.users?.find(u => u.email === invite.email);
+        if (existing) {
+          authUserId = existing.id;
+        } else {
+          return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 });
+        }
+      } else {
+        throw createError;
       }
-      throw signUpError;
+    } else if (authData?.user) {
+      authUserId = authData.user.id;
     }
 
-    if (!authData?.user) {
-      return NextResponse.json({ error: 'Failed to create user account.' }, { status: 500 });
+    if (!authUserId) {
+      return NextResponse.json({ error: 'Failed to create or find user account.' }, { status: 500 });
     }
 
-    // Link the new user to the org_members row
+    // Update password and metadata on existing account
+    if (createError?.code === 'email_exists') {
+      await supabase.auth.admin.updateUserById(authUserId, { password, user_metadata: { full_name } });
+    }
+
+    // Link the user to the org_members row
     const { error: updateError } = await supabase
       .from('org_members')
       .update({
-        user_id: authData.user.id,
+        user_id: authUserId,
         full_name,
         status: 'active',
         invite_token: null,

@@ -1719,6 +1719,7 @@ app.post("/api/team/accept-invite", async (req, res) => {
     }
 
     // Create the auth user (bypasses email confirmation with service_role key)
+    let authUserId: string | null = null;
     const { data: authData, error: createError } = await supabase.auth.admin.createUser({
       email: invite.email,
       password,
@@ -1727,21 +1728,36 @@ app.post("/api/team/accept-invite", async (req, res) => {
     });
 
     if (createError) {
-      if (createError.message.includes("already exists") || createError.message.includes("already registered")) {
-        return res.status(409).json({ error: "An account with this email already exists. Please log in." });
+      if (createError.code === 'email_exists') {
+        // User already has an auth account — fetch their existing ID
+        const { data: existingUsers } = await supabase.auth.admin.listUsers();
+        const existing = existingUsers?.users?.find(u => u.email === invite.email);
+        if (existing) {
+          authUserId = existing.id;
+        } else {
+          return res.status(409).json({ error: "An account with this email already exists." });
+        }
+      } else {
+        throw createError;
       }
-      throw createError;
+    } else if (authData?.user) {
+      authUserId = authData.user.id;
     }
 
-    if (!authData?.user) {
-      return res.status(500).json({ error: "Failed to create user account." });
+    if (!authUserId) {
+      return res.status(500).json({ error: "Failed to create or find user account." });
     }
 
-    // Link the new user to the org_members row
+    // Update password and metadata on existing account
+    if (createError?.code === 'email_exists') {
+      await supabase.auth.admin.updateUserById(authUserId, { password, user_metadata: { full_name } });
+    }
+
+    // Link the user to the org_members row
     const { error: updateError } = await supabase
       .from("org_members")
       .update({
-        user_id: authData.user.id,
+        user_id: authUserId,
         full_name,
         status: "active",
         invite_token: null,
@@ -1767,6 +1783,57 @@ app.post("/api/team/accept-invite", async (req, res) => {
       error: "Failed to accept invite",
       details: err.message,
     });
+  }
+});
+
+app.get("/api/team/my-role", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Missing authorization header." });
+    }
+    const token = authHeader.slice(7);
+
+    // Verify the token and get the user
+    const supabase = getSupabaseAdmin();
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) {
+      return res.status(401).json({ error: "Invalid or expired token." });
+    }
+
+    // Find org
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("id, owner_id")
+      .limit(1)
+      .maybeSingle();
+
+    if (!org) {
+      return res.json({ success: true, data: { role: "admin", org_id: null } });
+    }
+
+    // Look up role in org_members
+    const { data: member } = await supabase
+      .from("org_members")
+      .select("role")
+      .eq("org_id", org.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (member?.role) {
+      return res.json({ success: true, data: { role: member.role, org_id: org.id } });
+    }
+
+    // Fallback: check if user is org owner
+    if (org.owner_id === user.id) {
+      return res.json({ success: true, data: { role: "admin", org_id: org.id } });
+    }
+
+    // Not found anywhere — still allow access with minimal role
+    return res.json({ success: true, data: { role: "operations_coordinator", org_id: org.id } });
+  } catch (err: any) {
+    console.error("Error fetching role:", err);
+    res.status(500).json({ error: "Failed to fetch role." });
   }
 });
 

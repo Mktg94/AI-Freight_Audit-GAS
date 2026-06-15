@@ -290,6 +290,7 @@ export default function App() {
   const handleLoginSuccess = (userSession: any) => {
     setSession(userSession);
     localStorage.setItem('fa_mock_session', JSON.stringify(userSession));
+    localStorage.removeItem('freight_audit_active_role');
     
     // Add audit log
     const userEmail = userSession.user?.email || 'Anonymous user';

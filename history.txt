@@ -27,3 +27,11 @@
 - TeamMemberList UI — different actions per status: invited → Delete (hard), active → Remove (suspend), suspended → Reactivate + Delete
 - Added confirmation modals for delete and reactivate actions
 - Updated Next.js [memberId]/route.ts to match same logic (hard delete for invited, suspend for active, support status updates in PATCH)
+- Fixed Express POST /api/team/accept-invite — existing users with `email_exists` error are now looked up and linked to org instead of crashing with 500
+- Same fix applied to Next.js accept-invite route
+- Updated password + user_metadata on existing accounts via admin.updateUserById
+- Fixed RoleContext: non-owner staff no longer default to admin; falls back to operations_coordinator instead
+- Added GET /api/team/my-role endpoint in Express (bypasses RLS using admin client) for reliable role fetching
+- RoleContext now calls API endpoint first, falls back to direct Supabase query
+- Clear localStorage role override on login so fresh sessions fetch real DB role
+- FIXED security race condition: default role changed from 'admin' to 'operations_coordinator' in RoleContext to prevent admin UI flash before API resolves

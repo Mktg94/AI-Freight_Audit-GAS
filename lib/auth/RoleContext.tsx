@@ -15,12 +15,12 @@ interface RoleContextType {
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
-  const [role, setRoleState] = useState<UserRole>('admin');
+  const [role, setRoleState] = useState<UserRole>('operations_coordinator');
   const [orgId, setOrgId] = useState<string>('');
   const [userId, setUserId] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Allow setting the role (great for testing inside Settings/Appearance)
+  // Allow setting the role (for testing inside Settings > Security & Roles)
   const setRole = (newRole: UserRole) => {
     setRoleState(newRole);
     if (typeof window !== 'undefined') {
@@ -37,67 +37,59 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         if (user) {
           setUserId(user.id);
 
-          // Find organization
-          let activeOrgId = '';
-          try {
-            const { data: orgData } = await supabase
-              .from('organizations')
-              .select('id')
-              .limit(1)
-              .maybeSingle();
-            if (orgData?.id) {
-              setOrgId(orgData.id);
-              activeOrgId = orgData.id;
-            }
-          } catch {
-            // organizations table may not exist yet
-          }
-
-          if (!activeOrgId) {
-            setRoleState('admin');
-            return;
-          }
-
-          // Check if there is an override in localStorage first for demonstration/evaluation
+          // Check if there is an override in localStorage first
           const cachedRole = localStorage.getItem('freight_audit_active_role');
           if (cachedRole && ['admin', 'logistics_manager', 'finance_clerk', 'operations_coordinator'].includes(cachedRole)) {
             setRoleState(cachedRole as UserRole);
-          } else {
-            // Find role in org_members
-            try {
-              const { data: memberData } = await supabase
-                .from('org_members')
-                .select('role')
-                .eq('org_id', activeOrgId)
-                .eq('user_id', user.id)
-                .maybeSingle();
+            setIsLoading(false);
+            return;
+          }
 
-              if (memberData?.role) {
-                setRoleState(memberData.role as UserRole);
+          // Fetch session token for API auth
+          const { data: { session } } = await supabase.auth.getSession();
+          const token = session?.access_token;
+
+          if (token) {
+            const res = await fetch('/api/team/my-role', {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+              const result = await res.json();
+              if (result.success && result.data) {
+                setRoleState((result.data.role || 'operations_coordinator') as UserRole);
+                setOrgId(result.data.org_id || '');
+                setIsLoading(false);
                 return;
               }
-            } catch {
-              // org_members table may not exist yet
             }
+          }
 
-            try {
-              const { data: orgOwnerData } = await supabase
-                .from('organizations')
-                .select('owner_id')
-                .eq('id', activeOrgId)
-                .maybeSingle();
+          // Fallback: direct Supabase query
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('id, owner_id')
+            .limit(1)
+            .maybeSingle();
 
-              if (orgOwnerData?.owner_id === user.id) {
-                setRoleState('admin');
-              } else {
-                setRoleState('admin');
-              }
-            } catch {
+          if (orgData) {
+            setOrgId(orgData.id);
+
+            const { data: memberData } = await supabase
+              .from('org_members')
+              .select('role')
+              .eq('org_id', orgData.id)
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+            if (memberData?.role) {
+              setRoleState(memberData.role as UserRole);
+            } else if (orgData.owner_id === user.id) {
               setRoleState('admin');
+            } else {
+              setRoleState('operations_coordinator');
             }
           }
         } else {
-          // No user, check local storage for demo
           const cachedRole = localStorage.getItem('freight_audit_active_role');
           if (cachedRole) {
             setRoleState(cachedRole as UserRole);
@@ -105,7 +97,6 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.warn("Role Context Init failure, running in sandbox fallback mode:", err);
-        // Sandbox default fallback values
         const cachedRole = localStorage.getItem('freight_audit_active_role');
         if (cachedRole) {
           setRoleState(cachedRole as UserRole);
