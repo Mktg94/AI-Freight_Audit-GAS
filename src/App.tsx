@@ -12,6 +12,7 @@ import LandingPage from '../app/page';
 import AuditLogView from './components/AuditLogView';
 import LoginPage from '../app/auth/login/page';
 import SignupPage from '../app/auth/signup/page';
+import AcceptInvitePage from '../app/auth/accept-invite/page';
 import DashboardLayout from '../app/dashboard/layout';
 import DashboardPage from '../app/dashboard/page';
 import InvoiceUploadPage from '../app/invoices/upload/page';
@@ -360,6 +361,9 @@ export default function App() {
   }
 
   if (!session) {
+    if (currentPath.startsWith('/auth/accept-invite')) {
+      return <AcceptInvitePage />;
+    }
     if (currentPath === '/auth/signup' || currentPath === '/app/auth/signup') {
       return (
         <SignupPage 

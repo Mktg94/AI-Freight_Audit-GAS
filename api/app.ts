@@ -1236,8 +1236,8 @@ app.get("/api/team/members", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
-      .from("org_members")
-      .select("*, auth_users:user_id(email, raw_user_meta_data->>full_name)")
+      .from("org_member_details")
+      .select("*")
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -1246,7 +1246,7 @@ app.get("/api/team/members", async (req, res) => {
       id: m.id,
       org_id: m.org_id,
       user_id: m.user_id,
-      full_name: m.auth_users?.full_name || m.email || "Unknown",
+      full_name: m.full_name || m.user_full_name || m.email || "Unknown",
       email: m.email || "",
       role: m.role,
       status: m.status,
@@ -1260,14 +1260,51 @@ app.get("/api/team/members", async (req, res) => {
   }
 });
 
+// app.get("/api/team/members", async (req, res) => {
+//   try {
+//     const supabase = getSupabaseAdmin();
+
+//     const { data, error } = await supabase
+//       .from("org_members")
+//       .select("*")
+//       .order("created_at", { ascending: false });
+
+//     if (error) throw error;
+
+//     const members = data.map((m: any) => ({
+//       id: m.id,
+//       org_id: m.org_id,
+//       user_id: m.user_id,
+//       role: m.role,
+//       status: m.status,
+//       created_at: m.created_at,
+//     }));
+
+//     res.json({ success: true, data: members });
+//   } catch (err: any) {
+//     console.warn("Failed to fetch team members:", err.message);
+//     res.status(500).json({ success: false, data: [] });
+//   }
+// });
+
+
 app.patch("/api/team/:memberId", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
     const { memberId } = req.params;
-    const { role } = req.body;
+    const { role, status } = req.body;
+
+    const updates: any = {};
+    if (role) updates.role = role;
+    if (status) updates.status = status;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: "Nothing to update." });
+    }
+
     const { data, error } = await supabase
       .from("org_members")
-      .update({ role })
+      .update(updates)
       .eq("id", memberId)
       .select()
       .single();
@@ -1282,6 +1319,42 @@ app.delete("/api/team/:memberId", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
     const { memberId } = req.params;
+    const hard = req.query.hard === "true";
+
+    console.log("🗑️ DELETE member:", memberId, "hard:", hard);
+
+    // Get current member status
+    const { data: member, error: fetchError } = await supabase
+      .from("org_members")
+      .select("status, user_id")
+      .eq("id", memberId)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error("❌ Fetch error:", fetchError);
+      return res.status(500).json({ error: "Database error", details: fetchError.message });
+    }
+
+    if (!member) {
+      console.log("❌ Member not found:", memberId);
+      return res.status(404).json({ error: "Member not found." });
+    }
+
+    console.log("📋 Member status:", member.status, "user_id:", member.user_id);
+
+    // Hard delete for invited members or when ?hard=true
+    if (hard || member.status === "invited" || !member.user_id) {
+      const { error } = await supabase
+        .from("org_members")
+        .delete()
+        .eq("id", memberId);
+
+      if (error) throw error;
+      console.log("✅ Hard deleted:", memberId);
+      return res.json({ success: true, deleted: true });
+    }
+
+    // Suspend for active members (keep audit trail)
     const { data, error } = await supabase
       .from("org_members")
       .update({ status: "suspended" })
@@ -1289,62 +1362,411 @@ app.delete("/api/team/:memberId", async (req, res) => {
       .select()
       .single();
     if (error) throw error;
+    console.log("✅ Suspended:", memberId);
     res.json({ success: true, data });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to suspend member", details: err.message });
+    console.error("❌ Delete error:", err);
+    res.status(500).json({ error: "Failed to remove member", details: err.message });
   }
 });
+
+// app.post("/api/team/invite", async (req, res) => {
+//   try {
+//     const supabase = getSupabaseAdmin();
+//     const { email, role } = req.body;
+//     if (!email || !role) {
+//       return res.status(400).json({ error: "Missing email or role" });
+//     }
+
+//     const { data: existingUser } = await supabase
+//       .from("auth.users")
+//       .select("id")
+//       .eq("email", email)
+//       .maybeSingle();
+
+//     const userId = existingUser?.id || `pending-${Date.now()}`;
+//     const { data: orgData } = await supabase
+//       .from("organizations")
+//       .select("id, seat_limit")
+//       .limit(1)
+//       .single();
+
+//     if (!orgData) {
+//       return res.status(400).json({ error: "No organization found" });
+//     }
+
+//     const { count } = await supabase
+//       .from("org_members")
+//       .select("*", { count: "exact", head: true })
+//       .eq("org_id", orgData.id)
+//       .neq("status", "suspended");
+
+//     if (count !== null && count >= (orgData.seat_limit || 10)) {
+//       return res.status(403).json({ error: "seat_limit_reached", limit: orgData.seat_limit });
+//     }
+
+//     const { data, error } = await supabase
+//       .from("org_members")
+//       .insert({
+//         org_id: orgData.id,
+//         user_id: userId,
+//         role,
+//         status: "invited",
+//       })
+//       .select()
+//       .single();
+
+//     if (error) throw error;
+//     res.json({ success: true, data });
+//   } catch (err: any) {
+//     res.status(500).json({ error: "Failed to invite member", details: err.message });
+//   }
+// });
+
 
 app.post("/api/team/invite", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
     const { email, role } = req.body;
+
     if (!email || !role) {
       return res.status(400).json({ error: "Missing email or role" });
     }
 
-    const { data: existingUser } = await supabase
-      .from("auth.users")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
-    const userId = existingUser?.id || `pending-${Date.now()}`;
-    const { data: orgData } = await supabase
+    // 1. Get organization
+    const { data: orgData, error: orgError } = await supabase
       .from("organizations")
       .select("id, seat_limit")
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (!orgData) {
+    if (orgError || !orgData) {
       return res.status(400).json({ error: "No organization found" });
     }
 
-    const { count } = await supabase
+    const orgId = orgData.id;
+    const seatLimit = orgData.seat_limit ?? 10;
+
+    // 2. Seat limit check — count only active members (status = 'active')
+    const { count, error: countError } = await supabase
       .from("org_members")
       .select("*", { count: "exact", head: true })
-      .eq("org_id", orgData.id)
-      .neq("status", "suspended");
+      .eq("org_id", orgId)
+      .eq("status", "active");
 
-    if (count !== null && count >= (orgData.seat_limit || 10)) {
-      return res.status(403).json({ error: "seat_limit_reached", limit: orgData.seat_limit });
+    if (countError) {
+      return res.status(500).json({
+        error: "Failed to count members",
+        details: countError.message,
+      });
     }
 
-    const { data, error } = await supabase
+    if (count !== null && count >= seatLimit) {
+      return res.status(403).json({
+        error: "seat_limit_reached",
+        limit: seatLimit,
+      });
+    }
+
+    // 3. Check if email already has an entry in this org
+    const { data: existingMember } = await supabase
+      .from("org_members")
+      .select("id, status")
+      .eq("org_id", orgId)
+      .eq("email", email.toLowerCase().trim())
+      .maybeSingle();
+
+    if (existingMember) {
+      if (existingMember.status === "active") {
+        return res.status(409).json({ error: "This user is already a member of your organization." });
+      }
+      // Re-send invite for invited or suspended users
+      const token = `inv-${Math.random().toString(36).substring(2, 11)}`;
+      const { error: updateError } = await supabase
+        .from("org_members")
+        .update({
+          status: "invited",
+          invite_token: token,
+          role,
+          invited_at: new Date().toISOString(),
+          invite_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        })
+        .eq("id", existingMember.id);
+
+      if (updateError) throw updateError;
+
+      await sendExpressInviteEmail(email, role, token, orgId);
+
+      return res.json({ success: true, token, resent: true });
+    }
+
+    // 4. Create invite with email + token (no user_id needed)
+    const token = `inv-${Math.random().toString(36).substring(2, 11)}`;
+
+    const { error: insertError } = await supabase
       .from("org_members")
       .insert({
-        org_id: orgData.id,
-        user_id: userId,
+        org_id: orgId,
+        email: email.toLowerCase().trim(),
+        invite_token: token,
         role,
         status: "invited",
-      })
-      .select()
-      .single();
+        invite_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      });
 
-    if (error) throw error;
-    res.json({ success: true, data });
+    if (insertError) {
+      if (insertError.code === "23505") {
+        return res.status(409).json({ error: "An invitation for this email already exists." });
+      }
+      throw insertError;
+    }
+
+    // 5. Send email
+    await sendExpressInviteEmail(email, role, token, orgId);
+
+    return res.json({ success: true, token });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to invite member", details: err.message });
+    console.error("Invite error:", err);
+    return res.status(500).json({
+      error: "Unexpected server error",
+      details: err.message,
+    });
+  }
+});
+
+async function sendExpressInviteEmail(email: string, role: string, token: string, orgId: string) {
+  const inviteLink = `${process.env.APP_URL || "http://localhost:3000"}/auth/accept-invite?token=${token}&email=${encodeURIComponent(email)}`;
+
+  console.log("\n========================================");
+  console.log("📨 INVITE GENERATED");
+  console.log("   To:", email);
+  console.log("   Role:", role);
+  console.log("   Token:", token);
+  console.log("   Link:", inviteLink);
+  console.log("========================================\n");
+
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey || resendKey === "" || resendKey === "MY_RESEND_API_KEY") {
+    console.log("⚠️ RESEND_API_KEY not configured — copy the invite link above to share manually.");
+    return;
+  }
+
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(resendKey);
+
+    await resend.emails.send({
+      from: "Noreina Studio <onboarding@resend.dev>",
+      to: email,
+      subject: "You're invited to join FreightAudit AI",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="margin:0;padding:0;background-color:#F3F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F3F4F6;padding:40px 16px;">
+            <tr>
+              <td align="center">
+                <table width="520" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+                  
+                  <tr>
+                    <td style="background:linear-gradient(135deg,#4F46E5,#7C3AED);padding:32px 40px;text-align:center;">
+                      <div style="width:48px;height:48px;background:rgba(255,255,255,0.15);border-radius:12px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">
+                        <span style="color:#ffffff;font-size:22px;font-weight:800;">&#x1F6E1;</span>
+                      </div>
+                      <h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0 0 4px 0;">FreightAudit AI</h1>
+                      <p style="color:rgba(255,255,255,0.7);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin:0;">Automated Billing Protection</p>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td style="padding:32px 40px;">
+                      <h2 style="color:#111827;font-size:18px;font-weight:700;margin:0 0 4px 0;">You're Invited!</h2>
+                      <p style="color:#6B7280;font-size:14px;line-height:1.6;margin:0 0 20px 0;">
+                        You have been invited to join <strong style="color:#111827;">FreightAudit AI</strong> as a 
+                        <span style="display:inline-block;background:#EEF2FF;color:#4F46E5;font-size:12px;font-weight:600;padding:2px 10px;border-radius:4px;text-transform:capitalize;">${role.replace('_', ' ')}</span>
+                      </p>
+
+                      <table width="100%" cellpadding="0" cellspacing="0" style="background:#F9FAFB;border-radius:12px;padding:20px;margin-bottom:24px;">
+                        <tr>
+                          <td style="padding-bottom:12px;">
+                            <p style="color:#6B7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px 0;">Your Role</p>
+                            <p style="color:#111827;font-size:15px;font-weight:600;margin:0;text-transform:capitalize;">${role.replace('_', ' ')}</p>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding-bottom:12px;">
+                            <p style="color:#6B7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px 0;">Invitation Code</p>
+                            <p style="font-family:monospace;color:#4F46E5;font-size:16px;font-weight:700;margin:0;letter-spacing:1px;">${token}</p>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <p style="color:#6B7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px 0;">Expires</p>
+                            <p style="color:#111827;font-size:13px;margin:0;">In 7 days</p>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td align="center">
+                            <a href="${inviteLink}" style="display:inline-block;background:#4F46E5;color:#ffffff;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600;letter-spacing:0.3px;box-shadow:0 4px 12px rgba(79,70,229,0.3);">Accept Invitation</a>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <p style="color:#9CA3AF;font-size:12px;line-height:1.5;margin:20px 0 0 0;text-align:center;">
+                        This invitation was sent by your organization administrator. If you were not expecting this, you can safely ignore this email.
+                      </p>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td style="background:#F9FAFB;padding:20px 40px;text-align:center;border-top:1px solid #E5E7EB;">
+                      <p style="color:#9CA3AF;font-size:11px;margin:0;">FreightAudit AI &bull; Automated Billing Protection</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `
+    });
+
+    console.log("✅ Invite email sent successfully to", email);
+  } catch (emailErr: any) {
+    console.error("❌ Failed sending invite email:", emailErr.message);
+  }
+}
+
+
+app.get("/api/team/accept-invite", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const token = req.query.token as string;
+    const email = req.query.email as string;
+
+    if (!token) {
+      return res.status(400).json({ error: "Missing invite token." });
+    }
+
+    const { data: invite } = await supabase
+      .from("org_members")
+      .select(`
+        id, org_id, email, role, status, invited_at, invite_expires_at,
+        organizations:org_id ( name )
+      `)
+      .eq("invite_token", token)
+      .eq("status", "invited")
+      .maybeSingle();
+
+    if (!invite) {
+      return res.status(404).json({ error: "Invite not found or already accepted." });
+    }
+
+    if (invite.invite_expires_at && new Date(invite.invite_expires_at) < new Date()) {
+      return res.status(410).json({ error: "This invitation has expired." });
+    }
+
+    if (email && invite.email !== email.toLowerCase().trim()) {
+      return res.status(400).json({ error: "Email mismatch." });
+    }
+
+    res.json({
+      success: true,
+      invite: {
+        org_name: (invite.organizations as any)?.name || "Your Organization",
+        email: invite.email,
+        role: invite.role
+      }
+    });
+  } catch (err: any) {
+    console.error("Error validating invite:", err);
+    res.status(500).json({ error: "Failed to validate invitation." });
+  }
+});
+
+app.post("/api/team/accept-invite", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { token, full_name, password } = req.body;
+
+    if (!token || !full_name || !password) {
+      return res.status(400).json({ error: "Missing required fields: token, full_name, password." });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters." });
+    }
+
+    // Find invite by token
+    const { data: invite } = await supabase
+      .from("org_members")
+      .select("id, org_id, email, role, status")
+      .eq("invite_token", token)
+      .eq("status", "invited")
+      .maybeSingle();
+
+    if (!invite) {
+      return res.status(404).json({ error: "Invite not found or already accepted." });
+    }
+
+    if (!invite.email) {
+      return res.status(400).json({ error: "Invite has no associated email." });
+    }
+
+    // Create the auth user (bypasses email confirmation with service_role key)
+    const { data: authData, error: createError } = await supabase.auth.admin.createUser({
+      email: invite.email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name }
+    });
+
+    if (createError) {
+      if (createError.message.includes("already exists") || createError.message.includes("already registered")) {
+        return res.status(409).json({ error: "An account with this email already exists. Please log in." });
+      }
+      throw createError;
+    }
+
+    if (!authData?.user) {
+      return res.status(500).json({ error: "Failed to create user account." });
+    }
+
+    // Link the new user to the org_members row
+    const { error: updateError } = await supabase
+      .from("org_members")
+      .update({
+        user_id: authData.user.id,
+        full_name,
+        status: "active",
+        invite_token: null,
+        invited_at: new Date().toISOString()
+      })
+      .eq("id", invite.id);
+
+    if (updateError) {
+      console.error("Failed to link user to org:", updateError);
+      return res.json({
+        success: true,
+        warning: "Account created but failed to link to organization. Please contact support."
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Account created and linked to organization successfully."
+    });
+  } catch (err: any) {
+    console.error("Accept invite error:", err);
+    res.status(500).json({
+      error: "Failed to accept invite",
+      details: err.message,
+    });
   }
 });
 

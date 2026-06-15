@@ -1,0 +1,29 @@
+# Change History
+
+## 2026-06-15
+- Initialized history.txt to track all changes.
+- User Micky confirmed they want changes recorded in history.txt.
+- Mapped out the full invite-flow changes needed (Option B).
+- Wrote safe migration SQL in schema6.sql: make org_members.user_id nullable, add email/invite_token/expiry columns, fix get_user_org_id() for non-owner staff, add get_user_role() helper, update RLS policies, update org_member_details view with LEFT JOIN.
+- Fixed schema6.sql: changed DROP INDEX to ALTER TABLE DROP CONSTRAINT (was failing in Supabase).
+- Built the invite system (Option B flow):
+  - app/api/team/invite/route.ts — now stores email + invite_token (not inviter's user_id), checks for duplicate invites, supports re-inviting suspended users
+  - app/api/team/accept-invite/route.ts — GET validates invite token, POST creates auth user + links to org_members
+  - app/auth/accept-invite/page.tsx — accept-invite page showing org name + role, form for name + password only
+  - app/api/team/members/route.ts — GET members using org_member_details view
+  - src/App.tsx — added AcceptInvitePage import + route registration before session check
+- Fixed Express API (api/app.ts) to match the new invite flow:
+  - POST /api/team/invite — removed "must sign up first" check, now stores email + token, no user_id required
+  - GET /api/team/members — changed to use org_member_details view (fixes relationship cache error)
+  - POST /api/team/accept-invite — updated to look up by invite_token instead of user_id
+- Fixed Next.js invite route error string to match frontend expectation (limit_exceeded -> seat_limit_reached)
+- Added GET handler for /api/team/accept-invite in Express (was missing — caused "Invalid Invitation" error)
+- Added APP_URL to .env for correct invite links
+- Fixed Express POST /api/team/accept-invite — now creates auth user via admin.createUser() with email_confirm: true (was just updating status without creating the user)
+- Updated accept-invite page success screen to show the user's email for login
+- Fixed invite API to allow re-sending to already-invited users (was blocking with "already invited" error)
+- Express DELETE /api/team/:memberId — smart delete: hard delete for invited members, suspend for active members
+- Express PATCH /api/team/:memberId — now supports updating status (for reactivate) in addition to role
+- TeamMemberList UI — different actions per status: invited → Delete (hard), active → Remove (suspend), suspended → Reactivate + Delete
+- Added confirmation modals for delete and reactivate actions
+- Updated Next.js [memberId]/route.ts to match same logic (hard delete for invited, suspend for active, support status updates in PATCH)

@@ -18,10 +18,10 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { role } = body;
+    const { role, status } = body;
 
-    if (!role) {
-      return NextResponse.json({ error: 'Missing role update payload' }, { status: 400 });
+    if (!role && !status) {
+      return NextResponse.json({ error: 'Missing update payload (role or status)' }, { status: 400 });
     }
 
     // Retrieve target member details to check organization scope
@@ -48,9 +48,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'You cannot change your own organization role.' }, { status: 400 });
     }
 
+    const updates: Record<string, string> = {};
+    if (role) updates.role = role;
+    if (status) updates.status = status;
+
     const { data: updatedMember, error: updateError } = await supabase
       .from('org_members')
-      .update({ role })
+      .update(updates)
       .eq('id', memberId)
       .select()
       .single();
@@ -81,10 +85,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized access point' }, { status: 401 });
     }
 
-    // Retrieve target member details
+    // Retrieve target member details including status
     const { data: targetMember } = await supabase
       .from('org_members')
-      .select('org_id, user_id')
+      .select('org_id, user_id, status')
       .eq('id', memberId)
       .maybeSingle();
 
@@ -100,12 +104,26 @@ export async function DELETE(
       return NextResponse.json({ error: 'Insufficient permissions. Admins only.' }, { status: 403 });
     }
 
-    // Prevent self-removal
-    if (targetMember.user_id === user.id) {
+    // Prevent self-removal (only for members with user_id)
+    if (targetMember.user_id && targetMember.user_id === user.id) {
       return NextResponse.json({ error: 'You cannot remove or suspend your own account.' }, { status: 400 });
     }
 
-    // Set status to suspended as requested to keep an audit trail
+    // Hard delete for invited members (no auth account yet)
+    if (targetMember.status === 'invited' || !targetMember.user_id) {
+      const { error: deleteError } = await supabase
+        .from('org_members')
+        .delete()
+        .eq('id', memberId);
+
+      if (deleteError) {
+        return NextResponse.json({ error: deleteError.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, deleted: true });
+    }
+
+    // Suspend for active members (keep audit trail)
     const { data: suspendedMember, error: deleteError } = await supabase
       .from('org_members')
       .update({ status: 'suspended' })
