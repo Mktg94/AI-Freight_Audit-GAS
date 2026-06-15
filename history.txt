@@ -35,3 +35,9 @@
 - RoleContext now calls API endpoint first, falls back to direct Supabase query
 - Clear localStorage role override on login so fresh sessions fetch real DB role
 - FIXED security race condition: default role changed from 'admin' to 'operations_coordinator' in RoleContext to prevent admin UI flash before API resolves
+- Migrated all email sending from Resend to Mailjet (invites + dispute letters) across Express API and Next.js routes
+- Updated integrations settings UI and API endpoints to use Mailjet API key + secret instead of Resend
+- Removed RESEND_API_KEY from .env
+- Switched from Mailjet to Brevo (Sendinblue) API — uses direct fetch() to https://api.brevo.com/v3/smtp/email, no SDK dependency
+- Updated all email sending in Express (invite, disputes), Next.js (invite, disputes), integrations endpoints, and settings UI to use Brevo
+- Professional HTML email template for dispute letters with red gradient header, dispute summary card, formatted letter body, and branding footer

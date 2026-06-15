@@ -52,9 +52,9 @@ export default function SettingsPage() {
   const [companyName, setCompanyName] = useState('Atlas Global Logistics');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const [resendKey, setResendKey] = useState('');
+  const [brevoKey, setBrevoKey] = useState('');
   const [anthropicKey, setAnthropicKey] = useState('');
-  const [isResendConnected, setIsResendConnected] = useState(false);
+  const [isBrevoConnected, setIsBrevoConnected] = useState(false);
   const [isAnthropicConnected, setIsAnthropicConnected] = useState(false);
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
 
@@ -101,9 +101,9 @@ export default function SettingsPage() {
       if (resInt.ok) {
         const result = await resInt.json();
         if (result.success) {
-          setIsResendConnected(result.data.resend_connected);
+          setIsBrevoConnected(result.data.brevo_connected);
           setIsAnthropicConnected(result.data.anthropic_connected);
-          setResendKey(result.data.resend_api_key || '');
+          setBrevoKey(result.data.brevo_api_key || '');
           setAnthropicKey(result.data.anthropic_api_key || '');
         }
       }
@@ -168,7 +168,7 @@ export default function SettingsPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          resend_api_key: resendKey,
+          brevo_api_key: brevoKey,
           anthropic_api_key: anthropicKey
         })
       });
@@ -179,9 +179,9 @@ export default function SettingsPage() {
 
       const result = await response.json();
       if (result.success) {
-        setIsResendConnected(result.data.resend_connected);
+        setIsBrevoConnected(result.data.brevo_connected);
         setIsAnthropicConnected(result.data.anthropic_connected);
-        setResendKey(result.data.resend_api_key || '');
+        setBrevoKey(result.data.brevo_api_key || '');
         setAnthropicKey(result.data.anthropic_api_key || '');
         triggerToast('Integrations Standardized', 'Connected carrier intelligence nodes updated and saved.');
       }
@@ -476,11 +476,11 @@ export default function SettingsPage() {
                         <Mail size={18} />
                       </div>
                       <div>
-                        <h4 className="text-xs font-semibold text-gray-900 uppercase">Resend (Email)</h4>
-                        <p className="text-[9px] text-gray-400 font-mono">Mail client dispatching for carrier claims</p>
+                        <h4 className="text-xs font-semibold text-gray-900 uppercase">Brevo (Email)</h4>
+                        <p className="text-[9px] text-gray-400 font-mono">Mail client dispatching for invitations & claims</p>
                       </div>
                     </div>
-                    {isResendConnected ? (
+                    {isBrevoConnected ? (
                       <span className="flex items-center gap-1.5 text-[9px] font-semibold font-mono py-1 px-2.5 bg-green-50 text-green-700 rounded-full border border-green-200">
                         <CheckCircle size={10} /> Connected
                       </span>
@@ -492,12 +492,12 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[9px] font-mono uppercase text-gray-500 font-semibold block">Resend API Key</label>
+                    <label className="text-[9px] font-mono uppercase text-gray-500 font-semibold block">Brevo API Key</label>
                     <input
                       type="password"
-                      value={resendKey}
-                      onChange={(e) => setResendKey(e.target.value)}
-                      placeholder="re_xxxxxxxxxxxxxxxxxxx"
+                      value={brevoKey}
+                      onChange={(e) => setBrevoKey(e.target.value)}
+                      placeholder="xkeysib-..."
                       className="bg-gray-50 border border-gray-200 text-gray-900 focus:border-indigo-400 focus:ring-0 focus:outline-none rounded-lg p-2.5 w-full font-mono text-xs"
                     />
                   </div>

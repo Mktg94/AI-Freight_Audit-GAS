@@ -128,21 +128,23 @@ export async function POST(request: Request) {
 }
 
 async function sendInviteEmail(email: string, role: string, token: string, orgId: string) {
-  const resendApiKey = process.env.RESEND_API_KEY;
-  if (!resendApiKey) return;
+  const brevoKey = process.env.BREVO_API_KEY;
+  if (!brevoKey) return;
 
   try {
-    await fetch('https://api.resend.com/emails', {
+    const inviteLink = `${process.env.APP_URL || 'http://localhost:3000'}/auth/accept-invite?token=${token}&email=${encodeURIComponent(email)}`;
+
+    await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${resendApiKey}`
+        'api-key': brevoKey,
+        'content-type': 'application/json'
       },
       body: JSON.stringify({
-        from: 'FreightAudit AI <onboarding@resend.dev>',
-        to: email,
-        subject: `You've been invited to join FreightAudit AI`,
-        html: `
+        sender: { name: 'AI Freight Audit', email: 'mikeabrsh21@gmail.com' },
+        to: [{ email }],
+        subject: "You're invited to join FreightAudit AI",
+        htmlContent: `
           <!DOCTYPE html>
           <html>
           <head><meta charset="utf-8"></head>
@@ -181,7 +183,7 @@ async function sendInviteEmail(email: string, role: string, token: string, orgId
                         <table width="100%" cellpadding="0" cellspacing="0">
                           <tr>
                             <td align="center">
-                              <a href="${process.env.APP_URL || 'http://localhost:3000'}/auth/accept-invite?token=${token}&email=${encodeURIComponent(email)}" style="display:inline-block;background:#4F46E5;color:#ffffff;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(79,70,229,0.3);">Accept Invitation</a>
+                              <a href="${inviteLink}" style="display:inline-block;background:#4F46E5;color:#ffffff;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(79,70,229,0.3);">Accept Invitation</a>
                             </td>
                           </tr>
                         </table>
@@ -203,6 +205,6 @@ async function sendInviteEmail(email: string, role: string, token: string, orgId
       })
     });
   } catch (emailErr) {
-    console.error('Failed sending Resend email:', emailErr);
+    console.error('Failed sending Brevo email:', emailErr);
   }
 }
