@@ -1,5 +1,4 @@
 {
-  "functions": {},
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/((?!api/|assets/|.*\\.\\w+$).*)", "destination": "/index.html" }
