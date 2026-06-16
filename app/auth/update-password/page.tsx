@@ -31,11 +31,29 @@ export default function UpdatePasswordPage({ onPasswordUpdated }: UpdatePassword
     }
 
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
+
+    async function init() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          setErrorMsg(error.message);
+          return;
+        }
+        window.history.replaceState({}, '', '/auth/update-password');
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         setRecoveryReady(true);
+      } else {
+        setErrorMsg('Invalid or expired recovery link. Please request a new one.');
       }
-    });
+    }
+
+    init();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -140,14 +158,20 @@ export default function UpdatePasswordPage({ onPasswordUpdated }: UpdatePassword
           </div>
         )}
 
-        {!recoveryReady && !useMock && (
+        {!recoveryReady && !errorMsg && (
           <div className="p-4 text-center">
             <Loader2 size={20} className="animate-spin mx-auto mb-2 text-indigo-600" />
             <p className="text-sm text-gray-500">Validating recovery link...</p>
           </div>
         )}
 
-        {recoveryReady && (
+        {errorMsg && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-center">
+            <p className="text-[11px] text-red-600 font-medium leading-normal">{errorMsg}</p>
+          </div>
+        )}
+
+        {recoveryReady && !errorMsg && (
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">
               <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
@@ -201,12 +225,6 @@ export default function UpdatePasswordPage({ onPasswordUpdated }: UpdatePassword
                 <span>Reset Password</span>
               )}
             </button>
-
-            {errorMsg && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-center">
-                <p className="text-[11px] text-red-600 font-medium leading-normal">{errorMsg}</p>
-              </div>
-            )}
           </form>
         )}
       </div>
