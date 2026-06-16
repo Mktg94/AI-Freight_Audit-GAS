@@ -83,53 +83,53 @@ export function inviteEmailHtml(role: string, token: string, inviteLink: string)
   return baseWrapper(body, 'This is an automated invitation from FreightAudit AI');
 }
 
-export function disputeEmailHtml(invoiceId: string, carrierName: string, disputedAmount: number, letterText: string, disputeId: string) {
+export function disputeEmailHtml(invoiceNumber: string, carrierName: string, disputedAmount: number, letterText: string, disputeId: string) {
   const formattedAmount = Number(disputedAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const body = `
     <tr>
-      <td style="background:linear-gradient(135deg,#DC2626 0%,#EF4444 50%,#991B1B 100%);padding:40px 40px 36px;text-align:center;">
+      <td style="background:linear-gradient(135deg,#D97706 0%,#F59E0B 50%,#B45309 100%);padding:40px 40px 36px;text-align:center;">
         <table cellpadding="0" cellspacing="0" align="center" style="width:56px;">
           <tr>
             <td style="background:rgba(255,255,255,0.15);border-radius:14px;text-align:center;padding:12px;">
-              <span style="color:#ffffff;font-size:26px;line-height:1;">&#x26A0;</span>
+              <span style="color:#ffffff;font-size:26px;line-height:1;">&#x1F4CB;</span>
             </td>
           </tr>
         </table>
-        <h1 style="color:#ffffff;font-size:24px;font-weight:700;margin:16px 0 4px;letter-spacing:-0.3px;">Official Billing Dispute</h1>
+        <h1 style="color:#ffffff;font-size:24px;font-weight:700;margin:16px 0 4px;letter-spacing:-0.3px;">Billing Dispute Notice</h1>
         <p style="color:rgba(255,255,255,0.65);font-size:11px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;margin:0;">FreightAudit AI &bull; Automated Billing Protection</p>
       </td>
     </tr>
     <tr>
       <td style="padding:36px 40px 32px;">
         <p style="color:#6B7280;font-size:14px;line-height:1.7;margin:0 0 24px;">
-          A billing discrepancy has been identified on invoice <strong style="color:#1A1D23;">#${invoiceId}</strong>. 
+          A billing discrepancy has been identified on invoice <strong style="color:#1A1D23;">#${invoiceNumber}</strong>. 
           Please review the dispute details below at your earliest convenience.
         </p>
 
-        <table width="100%" cellpadding="0" cellspacing="0" style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;margin-bottom:28px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;margin-bottom:28px;">
           <tr>
             <td style="padding:20px 24px;">
-              <p style="color:#991B1B;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin:0 0 16px;">Dispute Summary</p>
+              <p style="color:#92400E;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin:0 0 16px;">Dispute Summary</p>
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="padding:6px 0;color:#7F1D1D;font-size:13px;">
-                    <strong>Invoice:</strong> #${invoiceId}
+                  <td style="padding:6px 0;color:#78350F;font-size:13px;">
+                    <strong>Invoice:</strong> #${invoiceNumber}
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding:6px 0;color:#7F1D1D;font-size:13px;">
+                  <td style="padding:6px 0;color:#78350F;font-size:13px;">
                     <strong>Carrier:</strong> ${carrierName || 'N/A'}
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding:6px 0;color:#7F1D1D;font-size:13px;">
-                    <strong>Disputed Amount:</strong> <span style="color:#DC2626;font-weight:700;">$${formattedAmount}</span>
+                  <td style="padding:6px 0;color:#78350F;font-size:13px;">
+                    <strong>Disputed Amount:</strong> <span style="color:#D97706;font-weight:700;">$${formattedAmount}</span>
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding:6px 0;color:#7F1D1D;font-size:13px;">
+                  <td style="padding:6px 0;color:#78350F;font-size:13px;">
                     <strong>Date:</strong> ${today}
                   </td>
                 </tr>
@@ -139,14 +139,14 @@ export function disputeEmailHtml(invoiceId: string, carrierName: string, dispute
         </table>
 
         <h3 style="color:#1A1D23;font-size:14px;font-weight:700;margin:0 0 12px;">Dispute Letter</h3>
-        <div style="background:#F8F9FB;border-radius:10px;padding:24px;border-left:4px solid #DC2626;line-height:1.8;color:#374151;font-size:13px;white-space:pre-wrap;">
+        <div style="background:#F8F9FB;border-radius:10px;padding:24px;border-left:4px solid #F59E0B;line-height:1.8;color:#374151;font-size:13px;white-space:pre-wrap;">
           ${letterText.replace(/\n/g, '<br>')}
         </div>
 
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:28px;">
           <tr>
             <td align="center">
-              <div style="display:inline-block;background:#DC2626;color:#ffffff;padding:12px 32px;border-radius:8px;font-size:13px;font-weight:600;letter-spacing:0.3px;box-shadow:0 2px 8px rgba(220,38,38,0.25);">
+              <div style="display:inline-block;background:#D97706;color:#ffffff;padding:12px 32px;border-radius:8px;font-size:13px;font-weight:600;letter-spacing:0.3px;box-shadow:0 2px 8px rgba(217,119,6,0.25);">
                 Dispute Ref: ${disputeId.slice(0, 8).toUpperCase()}
               </div>
             </td>

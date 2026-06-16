@@ -1124,14 +1124,25 @@ app.post("/api/disputes/:id/send", async (req, res) => {
       .single();
     if (fetchErr || !dispute) return res.status(404).json({ error: "Dispute not found" });
 
+    // Fetch invoice number for display
+    let invoiceNumber = dispute.invoice_id;
+    try {
+      const { data: inv } = await supabase
+        .from("invoices")
+        .select("invoice_number")
+        .eq("id", dispute.invoice_id)
+        .single();
+      if (inv?.invoice_number) invoiceNumber = inv.invoice_number;
+    } catch (_) {}
+
     // Send email via Gmail SMTP if app password is configured
     if (process.env.GMAIL_APP_PASSWORD && dispute.carrier_email) {
       try {
         await sendEmail({
           to: dispute.carrier_email,
-          subject: `OFFICIAL BILLING DISPUTE — Invoice #${dispute.invoice_id}`,
+          subject: `Billing Dispute Notice — Invoice #${invoiceNumber}`,
           html: disputeEmailHtml(
-            dispute.invoice_id,
+            invoiceNumber,
             dispute.carrier_name || 'N/A',
             dispute.total_disputed_amount || 0,
             dispute.dispute_letter_text || '',

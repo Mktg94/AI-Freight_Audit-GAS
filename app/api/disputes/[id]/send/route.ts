@@ -44,15 +44,26 @@ export async function POST(
       return NextResponse.json({ error: "Dispute not found" }, { status: 404 });
     }
 
+    // Fetch invoice number for display
+    let invoiceNumber = dispute.invoice_id;
+    try {
+      const { data: inv } = await supabase
+        .from('invoices')
+        .select('invoice_number')
+        .eq('id', dispute.invoice_id)
+        .single();
+      if (inv?.invoice_number) invoiceNumber = inv.invoice_number;
+    } catch (_) {}
+
     if (process.env.GMAIL_APP_PASSWORD) {
       try {
         const { sendEmail } = await import('@/lib/email');
         const { disputeEmailHtml } = await import('@/lib/email-templates');
         await sendEmail({
           to: dispute.carrier_email || 'claims@carrier-trucking.com',
-          subject: `OFFICIAL BILLING DISPUTE — Invoice #${dispute.invoice_id}`,
+          subject: `Billing Dispute Notice — Invoice #${invoiceNumber}`,
           html: disputeEmailHtml(
-            dispute.invoice_id,
+            invoiceNumber,
             dispute.carrier_name || 'N/A',
             dispute.total_disputed_amount || 0,
             dispute.dispute_letter_text || '',
