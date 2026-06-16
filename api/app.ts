@@ -2,9 +2,9 @@ import crypto from "crypto";
 import express from "express";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
-import { extractInvoiceData } from "../lib/ai/extractInvoice.js";
-import { auditLineItems } from "../lib/ai/auditInvoice.js";
-import { generateDisputeLetter } from "../lib/ai/generateDispute.js";
+import { extractInvoiceData } from "../lib/ai/extractInvoice";
+import { auditLineItems } from "../lib/ai/auditInvoice";
+import { generateDisputeLetter } from "../lib/ai/generateDispute";
 
 const uploadRouter = multer({ storage: multer.memoryStorage() });
 
