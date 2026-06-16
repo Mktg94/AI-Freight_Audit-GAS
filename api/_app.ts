@@ -5,6 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 import { extractInvoiceData } from "../lib/ai/extractInvoice";
 import { auditLineItems } from "../lib/ai/auditInvoice";
 import { generateDisputeLetter } from "../lib/ai/generateDispute";
+import { sendEmail } from "../lib/email";
+import { inviteEmailHtml, disputeEmailHtml } from "../lib/email-templates";
 
 const uploadRouter = multer({ storage: multer.memoryStorage() });
 
@@ -1122,98 +1124,19 @@ app.post("/api/disputes/:id/send", async (req, res) => {
       .single();
     if (fetchErr || !dispute) return res.status(404).json({ error: "Dispute not found" });
 
-    // Send email via Brevo if API key is configured
-    const brevoKey = process.env.BREVO_API_KEY;
-    if (brevoKey && dispute.carrier_email) {
+    // Send email via Gmail SMTP if app password is configured
+    if (process.env.GMAIL_APP_PASSWORD && dispute.carrier_email) {
       try {
-        await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          headers: {
-            'api-key': brevoKey,
-            'content-type': 'application/json'
-          },
-          body: JSON.stringify({
-            sender: { name: 'AI Freight Audit', email: 'mikeabrsh21@gmail.com' },
-            to: [{ email: dispute.carrier_email }],
-            subject: `OFFICIAL BILLING DISPUTE — Invoice #${dispute.invoice_id}`,
-            htmlContent: `
-              <!DOCTYPE html>
-              <html>
-              <head><meta charset="utf-8"></head>
-              <body style="margin:0;padding:0;background-color:#F3F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-                <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F3F4F6;padding:40px 16px;">
-                  <tr>
-                    <td align="center">
-                      <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
-
-                        <!-- Header -->
-                        <tr>
-                          <td style="background:linear-gradient(135deg,#DC2626,#991B1B);padding:32px 40px;text-align:center;">
-                            <div style="width:56px;height:56px;background:rgba(255,255,255,0.15);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">
-                              <span style="color:#ffffff;font-size:26px;font-weight:800;">&#x26A0;</span>
-                            </div>
-                            <h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0 0 4px 0;">Official Billing Dispute</h1>
-                            <p style="color:rgba(255,255,255,0.7);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin:0;">FreightAudit AI &bull; Automated Billing Protection</p>
-                          </td>
-                        </tr>
-
-                        <!-- Body -->
-                        <tr>
-                          <td style="padding:32px 40px;">
-
-                            <!-- Dispute Summary Card -->
-                            <table width="100%" cellpadding="0" cellspacing="0" style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:20px;margin-bottom:24px;">
-                              <tr>
-                                <td style="padding-bottom:10px;">
-                                  <p style="color:#991B1B;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px 0;">Dispute Summary</p>
-                                  <p style="color:#7F1D1D;font-size:13px;margin:0;"><strong>Invoice:</strong> #${dispute.invoice_id}</p>
-                                  <p style="color:#7F1D1D;font-size:13px;margin:4px 0 0 0;"><strong>Carrier:</strong> ${dispute.carrier_name || 'N/A'}</p>
-                                  <p style="color:#7F1D1D;font-size:13px;margin:4px 0 0 0;"><strong>Disputed Amount:</strong> $${Number(dispute.total_disputed_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                                  <p style="color:#7F1D1D;font-size:13px;margin:4px 0 0 0;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})}</p>
-                                </td>
-                              </tr>
-                            </table>
-
-                            <!-- Dispute Letter Content -->
-                            <h2 style="color:#111827;font-size:16px;font-weight:700;margin:0 0 12px 0;">Dispute Letter</h2>
-                            <div style="background:#F9FAFB;border-radius:12px;padding:24px;border-left:4px solid #DC2626;line-height:1.8;color:#374151;font-size:13px;white-space:pre-wrap;">
-                              ${dispute.dispute_letter_text.replace(/\n/g, '<br>')}
-                            </div>
-
-                            <div style="border-top:1px solid #E5E7EB;margin-top:24px;padding-top:20px;">
-                              <table width="100%" cellpadding="0" cellspacing="0">
-                                <tr>
-                                  <td align="center">
-                                    <div style="display:inline-block;background:#DC2626;color:#ffffff;padding:12px 28px;border-radius:8px;font-size:13px;font-weight:600;letter-spacing:0.3px;">
-                                      Dispute Reference: ${dispute.id.slice(0,8)}...
-                                    </div>
-                                  </td>
-                                </tr>
-                              </table>
-                            </div>
-
-                            <p style="color:#9CA3AF;font-size:12px;line-height:1.5;margin:20px 0 0 0;text-align:center;">
-                              This is an official billing dispute generated by FreightAudit AI. Please review and respond at your earliest convenience.
-                            </p>
-
-                          </td>
-                        </tr>
-
-                        <!-- Footer -->
-                        <tr>
-                          <td style="background:#F9FAFB;padding:20px 40px;text-align:center;border-top:1px solid #E5E7EB;">
-                            <p style="color:#9CA3AF;font-size:11px;margin:0;">AI Freight Audit &bull; Automated Billing Protection</p>
-                            <p style="color:#D1D5DB;font-size:10px;margin:6px 0 0 0;">This is an automated communication. Please do not reply to this email.</p>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-              </body>
-              </html>
-            `
-          })
+        await sendEmail({
+          to: dispute.carrier_email,
+          subject: `OFFICIAL BILLING DISPUTE — Invoice #${dispute.invoice_id}`,
+          html: disputeEmailHtml(
+            dispute.invoice_id,
+            dispute.carrier_name || 'N/A',
+            dispute.total_disputed_amount || 0,
+            dispute.dispute_letter_text || '',
+            dispute.id
+          ),
         });
       } catch (emailErr: any) {
         console.warn("Email send failed (continuing):", emailErr.message);
@@ -1626,113 +1549,16 @@ async function sendExpressInviteEmail(email: string, role: string, token: string
   console.log("   Link:", inviteLink);
   console.log("========================================\n");
 
-  const brevoKey = process.env.BREVO_API_KEY;
-  if (!brevoKey) {
-    console.log("⚠️ BREVO_API_KEY not configured — copy the invite link above to share manually.");
-    return;
-  }
+  const sent = await sendEmail({
+    to: email,
+    subject: "You're invited to join FreightAudit AI",
+    html: inviteEmailHtml(role, token, inviteLink),
+  });
 
-  try {
-    const inviteLink = `${process.env.APP_URL || "http://localhost:3000"}/auth/accept-invite?token=${token}&email=${encodeURIComponent(email)}`;
-
-    const emailHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="utf-8"></head>
-        <body style="margin:0;padding:0;background-color:#F3F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F3F4F6;padding:40px 16px;">
-            <tr>
-              <td align="center">
-                <table width="520" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
-                  
-                  <tr>
-                    <td style="background:linear-gradient(135deg,#4F46E5,#7C3AED);padding:32px 40px;text-align:center;">
-                      <div style="width:48px;height:48px;background:rgba(255,255,255,0.15);border-radius:12px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">
-                        <span style="color:#ffffff;font-size:22px;font-weight:800;">&#x1F6E1;</span>
-                      </div>
-                      <h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0 0 4px 0;">FreightAudit AI</h1>
-                      <p style="color:rgba(255,255,255,0.7);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin:0;">Automated Billing Protection</p>
-                    </td>
-                  </tr>
-
-                  <tr>
-                    <td style="padding:32px 40px;">
-                      <h2 style="color:#111827;font-size:18px;font-weight:700;margin:0 0 4px 0;">You're Invited!</h2>
-                      <p style="color:#6B7280;font-size:14px;line-height:1.6;margin:0 0 20px 0;">
-                        You have been invited to join <strong style="color:#111827;">FreightAudit AI</strong> as a 
-                        <span style="display:inline-block;background:#EEF2FF;color:#4F46E5;font-size:12px;font-weight:600;padding:2px 10px;border-radius:4px;text-transform:capitalize;">${role.replace('_', ' ')}</span>
-                      </p>
-
-                      <table width="100%" cellpadding="0" cellspacing="0" style="background:#F9FAFB;border-radius:12px;padding:20px;margin-bottom:24px;">
-                        <tr>
-                          <td style="padding-bottom:12px;">
-                            <p style="color:#6B7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px 0;">Your Role</p>
-                            <p style="color:#111827;font-size:15px;font-weight:600;margin:0;text-transform:capitalize;">${role.replace('_', ' ')}</p>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style="padding-bottom:12px;">
-                            <p style="color:#6B7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px 0;">Invitation Code</p>
-                            <p style="font-family:monospace;color:#4F46E5;font-size:16px;font-weight:700;margin:0;letter-spacing:1px;">${token}</p>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <p style="color:#6B7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px 0;">Expires</p>
-                            <p style="color:#111827;font-size:13px;margin:0;">In 7 days</p>
-                          </td>
-                        </tr>
-                      </table>
-
-                      <table width="100%" cellpadding="0" cellspacing="0">
-                        <tr>
-                          <td align="center">
-                            <a href="${inviteLink}" style="display:inline-block;background:#4F46E5;color:#ffffff;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600;letter-spacing:0.3px;box-shadow:0 4px 12px rgba(79,70,229,0.3);">Accept Invitation</a>
-                          </td>
-                        </tr>
-                      </table>
-
-                      <p style="color:#9CA3AF;font-size:12px;line-height:1.5;margin:20px 0 0 0;text-align:center;">
-                        This invitation was sent by your organization administrator. If you were not expecting this, you can safely ignore this email.
-                      </p>
-                    </td>
-                  </tr>
-
-                  <tr>
-                    <td style="background:#F9FAFB;padding:20px 40px;text-align:center;border-top:1px solid #E5E7EB;">
-                      <p style="color:#9CA3AF;font-size:11px;margin:0;">FreightAudit AI &bull; Automated Billing Protection</p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-        </html>
-    `;
-
-    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'api-key': brevoKey,
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
-        sender: { name: 'AI Freight Audit', email: 'mikeabrsh21@gmail.com' },
-        to: [{ email }],
-        subject: "You're invited to join FreightAudit AI",
-        htmlContent: emailHtml
-      })
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text();
-      console.error("❌ Brevo API error:", res.status, errBody);
-    } else {
-      console.log("✅ Invite email sent successfully to", email);
-    }
-  } catch (emailErr: any) {
-    console.error("❌ Failed sending invite email:", emailErr.message);
+  if (sent) {
+    console.log("✅ Invite email sent successfully to", email);
+  } else {
+    console.log("⚠️ GMAIL_APP_PASSWORD not configured — copy the invite link above to share manually.");
   }
 }
 
@@ -2006,8 +1832,8 @@ app.get("/api/settings/integrations", (_req, res) => {
   res.json({
     success: true,
     data: {
-      brevo_connected: !!process.env.BREVO_API_KEY,
-      brevo_api_key: process.env.BREVO_API_KEY || "",
+      email_connected: !!process.env.GMAIL_APP_PASSWORD,
+      email_configured: !!process.env.GMAIL_APP_PASSWORD,
       gemini_connected: !!process.env.GEMINI_API_KEY,
       gemini_api_key: process.env.GEMINI_API_KEY || "",
     },
@@ -2015,16 +1841,17 @@ app.get("/api/settings/integrations", (_req, res) => {
 });
 
 app.patch("/api/settings/integrations", (req, res) => {
-  const { brevo_api_key } = req.body;
-  if (brevo_api_key !== undefined) {
-    process.env.BREVO_API_KEY = brevo_api_key;
+  const { gemini_api_key } = req.body;
+  if (gemini_api_key !== undefined) {
+    process.env.GEMINI_API_KEY = gemini_api_key;
   }
   res.json({
     success: true,
     data: {
-      brevo_connected: !!process.env.BREVO_API_KEY,
-      brevo_api_key: process.env.BREVO_API_KEY || "",
+      email_connected: !!process.env.GMAIL_APP_PASSWORD,
+      email_configured: !!process.env.GMAIL_APP_PASSWORD,
       gemini_connected: !!process.env.GEMINI_API_KEY,
+      gemini_api_key: process.env.GEMINI_API_KEY || "",
     },
   });
 });

@@ -13,6 +13,8 @@ import AuditLogView from './components/AuditLogView';
 import LoginPage from '../app/auth/login/page';
 import SignupPage from '../app/auth/signup/page';
 import AcceptInvitePage from '../app/auth/accept-invite/page';
+import ForgotPasswordPage from '../app/auth/forgot-password/page';
+import UpdatePasswordPage from '../app/auth/update-password/page';
 import DashboardLayout from '../app/dashboard/layout';
 import DashboardPage from '../app/dashboard/page';
 import InvoiceUploadPage from '../app/invoices/upload/page';
@@ -118,8 +120,9 @@ export default function App() {
         }
       });
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
         setSession(newSession);
+        if (event === 'PASSWORD_RECOVERY') return;
         if (newSession && window.location.pathname.startsWith('/auth')) {
           window.history.pushState({}, '', '/dashboard');
           setCurrentPath('/dashboard');
@@ -376,6 +379,26 @@ export default function App() {
         />
       );
     }
+    if (currentPath === '/auth/forgot-password') {
+      return (
+        <ForgotPasswordPage
+          onNavigateToLogin={() => {
+            window.history.pushState({}, '', '/auth/login');
+            setCurrentPath('/auth/login');
+          }}
+        />
+      );
+    }
+    if (currentPath === '/auth/update-password') {
+      return (
+        <UpdatePasswordPage
+          onPasswordUpdated={() => {
+            window.history.pushState({}, '', '/auth/login');
+            setCurrentPath('/auth/login');
+          }}
+        />
+      );
+    }
     // Default fallback is always login
     return (
       <LoginPage 
@@ -383,6 +406,18 @@ export default function App() {
         onNavigateToSignup={() => {
           window.history.pushState({}, '', '/auth/signup');
           setCurrentPath('/auth/signup');
+        }}
+      />
+    );
+  }
+
+  // Update-password also renders when session exists (after PASSWORD_RECOVERY)
+  if (currentPath === '/auth/update-password') {
+    return (
+      <UpdatePasswordPage
+        onPasswordUpdated={() => {
+          window.history.pushState({}, '', '/auth/login');
+          setCurrentPath('/auth/login');
         }}
       />
     );

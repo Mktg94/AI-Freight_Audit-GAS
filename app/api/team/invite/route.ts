@@ -128,83 +128,17 @@ export async function POST(request: Request) {
 }
 
 async function sendInviteEmail(email: string, role: string, token: string, orgId: string) {
-  const brevoKey = process.env.BREVO_API_KEY;
-  if (!brevoKey) return;
-
   try {
     const inviteLink = `${process.env.APP_URL || 'http://localhost:3000'}/auth/accept-invite?token=${token}&email=${encodeURIComponent(email)}`;
 
-    await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'api-key': brevoKey,
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
-        sender: { name: 'AI Freight Audit', email: 'mikeabrsh21@gmail.com' },
-        to: [{ email }],
-        subject: "You're invited to join FreightAudit AI",
-        htmlContent: `
-          <!DOCTYPE html>
-          <html>
-          <head><meta charset="utf-8"></head>
-          <body style="margin:0;padding:0;background-color:#F3F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F3F4F6;padding:40px 16px;">
-              <tr>
-                <td align="center">
-                  <table width="520" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
-                    <tr>
-                      <td style="background:linear-gradient(135deg,#4F46E5,#7C3AED);padding:32px 40px;text-align:center;">
-                        <h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0 0 4px 0;">FreightAudit AI</h1>
-                        <p style="color:rgba(255,255,255,0.7);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin:0;">Automated Billing Protection</p>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style="padding:32px 40px;">
-                        <h2 style="color:#111827;font-size:18px;font-weight:700;margin:0 0 4px 0;">You're Invited!</h2>
-                        <p style="color:#6B7280;font-size:14px;line-height:1.6;margin:0 0 20px 0;">
-                          You have been invited to join <strong style="color:#111827;">FreightAudit AI</strong> as a 
-                          <span style="display:inline-block;background:#EEF2FF;color:#4F46E5;font-size:12px;font-weight:600;padding:2px 10px;border-radius:4px;text-transform:capitalize;">${role.replace('_', ' ')}</span>
-                        </p>
-                        <table width="100%" cellpadding="0" cellspacing="0" style="background:#F9FAFB;border-radius:12px;padding:20px;margin-bottom:24px;">
-                          <tr>
-                            <td style="padding-bottom:12px;">
-                              <p style="color:#6B7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px 0;">Invitation Code</p>
-                              <p style="font-family:monospace;color:#4F46E5;font-size:16px;font-weight:700;margin:0;letter-spacing:1px;">${token}</p>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td>
-                              <p style="color:#6B7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px 0;">Expires</p>
-                              <p style="color:#111827;font-size:13px;margin:0;">In 7 days</p>
-                            </td>
-                          </tr>
-                        </table>
-                        <table width="100%" cellpadding="0" cellspacing="0">
-                          <tr>
-                            <td align="center">
-                              <a href="${inviteLink}" style="display:inline-block;background:#4F46E5;color:#ffffff;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(79,70,229,0.3);">Accept Invitation</a>
-                            </td>
-                          </tr>
-                        </table>
-                        <p style="color:#9CA3AF;font-size:12px;line-height:1.5;margin:20px 0 0 0;text-align:center;">This invitation was sent by your organization administrator.</p>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style="background:#F9FAFB;padding:20px 40px;text-align:center;border-top:1px solid #E5E7EB;">
-                        <p style="color:#9CA3AF;font-size:11px;margin:0;">FreightAudit AI &bull; Automated Billing Protection</p>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-          </body>
-          </html>
-        `
-      })
+    const { sendEmail } = await import('@/lib/email');
+    const { inviteEmailHtml } = await import('@/lib/email-templates');
+    await sendEmail({
+      to: email,
+      subject: "You're invited to join FreightAudit AI",
+      html: inviteEmailHtml(role, token, inviteLink),
     });
   } catch (emailErr) {
-    console.error('Failed sending Brevo email:', emailErr);
+    console.error('Failed sending invite email:', emailErr);
   }
 }

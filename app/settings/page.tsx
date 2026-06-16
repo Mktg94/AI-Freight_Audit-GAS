@@ -52,9 +52,8 @@ export default function SettingsPage() {
   const [companyName, setCompanyName] = useState('Atlas Global Logistics');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const [brevoKey, setBrevoKey] = useState('');
+  const [gmailConfigured, setGmailConfigured] = useState(false);
   const [anthropicKey, setAnthropicKey] = useState('');
-  const [isBrevoConnected, setIsBrevoConnected] = useState(false);
   const [isAnthropicConnected, setIsAnthropicConnected] = useState(false);
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
 
@@ -101,9 +100,8 @@ export default function SettingsPage() {
       if (resInt.ok) {
         const result = await resInt.json();
         if (result.success) {
-          setIsBrevoConnected(result.data.brevo_connected);
+          setGmailConfigured(result.data.email_configured || result.data.email_connected);
           setIsAnthropicConnected(result.data.anthropic_connected);
-          setBrevoKey(result.data.brevo_api_key || '');
           setAnthropicKey(result.data.anthropic_api_key || '');
         }
       }
@@ -168,7 +166,6 @@ export default function SettingsPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brevo_api_key: brevoKey,
           anthropic_api_key: anthropicKey
         })
       });
@@ -179,9 +176,8 @@ export default function SettingsPage() {
 
       const result = await response.json();
       if (result.success) {
-        setIsBrevoConnected(result.data.brevo_connected);
+        setGmailConfigured(result.data.email_connected || result.data.email_configured);
         setIsAnthropicConnected(result.data.anthropic_connected);
-        setBrevoKey(result.data.brevo_api_key || '');
         setAnthropicKey(result.data.anthropic_api_key || '');
         triggerToast('Integrations Standardized', 'Connected carrier intelligence nodes updated and saved.');
       }
@@ -476,30 +472,24 @@ export default function SettingsPage() {
                         <Mail size={18} />
                       </div>
                       <div>
-                        <h4 className="text-xs font-semibold text-gray-900 uppercase">Brevo (Email)</h4>
-                        <p className="text-[9px] text-gray-400 font-mono">Mail client dispatching for invitations & claims</p>
+                        <h4 className="text-xs font-semibold text-gray-900 uppercase">Gmail SMTP</h4>
+                        <p className="text-[9px] text-gray-400 font-mono">Email dispatch via mikeabrsh21@gmail.com</p>
                       </div>
                     </div>
-                    {isBrevoConnected ? (
+                    {gmailConfigured ? (
                       <span className="flex items-center gap-1.5 text-[9px] font-semibold font-mono py-1 px-2.5 bg-green-50 text-green-700 rounded-full border border-green-200">
                         <CheckCircle size={10} /> Connected
                       </span>
                     ) : (
                       <span className="flex items-center gap-1.5 text-[9px] font-semibold font-mono py-1 px-2.5 bg-gray-100 text-gray-400 rounded-full border border-gray-200">
-                        Missing Key
+                        Not Configured
                       </span>
                     )}
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-mono uppercase text-gray-500 font-semibold block">Brevo API Key</label>
-                    <input
-                      type="password"
-                      value={brevoKey}
-                      onChange={(e) => setBrevoKey(e.target.value)}
-                      placeholder="xkeysib-..."
-                      className="bg-gray-50 border border-gray-200 text-gray-900 focus:border-indigo-400 focus:ring-0 focus:outline-none rounded-lg p-2.5 w-full font-mono text-xs"
-                    />
+                  <div className="text-xs text-gray-500 leading-relaxed">
+                    Email is sent via Gmail SMTP using <strong className="text-gray-700">mikeabrsh21@gmail.com</strong>
+                    with a generated app password. Set the <code className="text-indigo-600 bg-indigo-50 px-1 rounded text-[10px] font-mono">GMAIL_APP_PASSWORD</code> environment variable on the server.
                   </div>
                 </div>
 

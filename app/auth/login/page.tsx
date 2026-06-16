@@ -162,6 +162,16 @@ export default function LoginPage({ onLoginSuccess, onNavigateToSignup }: LoginP
               <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                 Account Password
               </label>
+              <button
+                type="button"
+                onClick={() => {
+                  window.history.pushState({}, '', '/auth/forgot-password');
+                  window.dispatchEvent(new Event('popstate'));
+                }}
+                className="text-[11px] text-indigo-600 font-medium hover:underline bg-transparent border-none cursor-pointer"
+              >
+                Forgot?
+              </button>
             </div>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
