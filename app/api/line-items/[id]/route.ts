@@ -10,7 +10,7 @@ export async function PATCH(
   try {
     const { id } = params;
     const body = await request.json();
-    const { status } = body;
+    const { status, approval_reason, approval_notes } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Missing line item ID" }, { status: 400 });
@@ -51,9 +51,17 @@ export async function PATCH(
     }
     const invoiceId = currentLine.invoice_id;
 
+    const updateFields: Record<string, any> = {
+      status,
+      reviewed_by: userId,
+      reviewed_at: now,
+    };
+    if (approval_reason) updateFields.approval_reason = approval_reason;
+    if (approval_notes) updateFields.approval_notes = approval_notes;
+
     const { data: finalItem, error: updateErr } = await supabase
       .from('line_items')
-      .update({ status, reviewed_by: userId, reviewed_at: now })
+      .update(updateFields)
       .eq('id', id)
       .select()
       .single();

@@ -8,20 +8,24 @@ interface ContractCardProps {
   onDelete?: (contractId: string) => void | Promise<void> | any;
 }
 
+function formatRate(rate: number, rateType: string): string {
+  if (rateType === 'Not Allowed') return 'Not Allowed';
+  if (rateType === 'Percentage of base freight charge' || rateType === 'Percentage of cargo value') {
+    return `${rate}%`;
+  }
+  return `$${Number(rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+}
+
+function rateTypeShort(type: string): string {
+  if (type === 'Flat fee per occurrence') return '/occurrence';
+  if (type === 'Percentage of base freight charge') return '% of base';
+  if (type === 'Percentage of cargo value') return '% of value';
+  if (type === 'Not Allowed') return '';
+  return `/${type.split(' ').pop()}`;
+}
+
 export default function ContractCard({ contract, onEdit, onDelete }: ContractCardProps) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
-
-  const formatRate = (rate: number, isPct = false) => {
-    if (isPct) {
-      return `${(rate * 100).toFixed(1)}%`;
-    }
-    return rate.toLocaleString('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 4,
-    });
-  };
 
   const handleEditClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -47,6 +51,8 @@ export default function ContractCard({ contract, onEdit, onDelete }: ContractCar
   };
 
   const isActive = new Date(contract.expiry_date) >= new Date();
+  const displayItems = (contract.charge_items || []).slice(0, 6);
+  const remaining = (contract.charge_items || []).length - 6;
 
   return (
     <div 
@@ -74,54 +80,36 @@ export default function ContractCard({ contract, onEdit, onDelete }: ContractCar
           </span>
         )}
 
-        <div className="grid grid-cols-2 gap-2 mt-4">
-          <div className="bg-gray-50 rounded-xl px-3 py-2 border border-gray-50">
-            <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wide">Base / lb</span>
+        {contract.minimum_charge > 0 && (
+          <div className="mt-3 bg-gray-50 rounded-xl px-3 py-2 border border-gray-50 inline-block">
+            <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Min Charge</span>
             <span className="block text-sm font-mono font-semibold text-gray-900 mt-0.5">
-              {formatRate(contract.base_rate_per_lb)}
+              ${contract.minimum_charge.toLocaleString()}
             </span>
           </div>
+        )}
 
-          <div className="bg-gray-50 rounded-xl px-3 py-2 border border-gray-50">
-            <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wide">Fuel %</span>
-            <span className="block text-sm font-mono font-semibold text-gray-900 mt-0.5">
-              {formatRate(contract.fuel_surcharge_pct, true)}
+        {displayItems.length > 0 && (
+          <div className="mt-4 space-y-1.5">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">
+              Charge Items ({contract.charge_items.length})
             </span>
-          </div>
-
-          <div className="bg-gray-50 rounded-xl px-3 py-2 border border-gray-50">
-            <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wide">Residential</span>
-            <span className="block text-sm font-mono font-semibold text-gray-900 mt-0.5">
-              {formatRate(contract.residential_surcharge)}
-            </span>
-          </div>
-
-          <div className="bg-gray-50 rounded-xl px-3 py-2 border border-gray-50">
-            <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wide">Liftgate</span>
-            <span className="block text-sm font-mono font-semibold text-gray-900 mt-0.5">
-              {formatRate(contract.liftgate_fee)}
-            </span>
-          </div>
-        </div>
-
-        {contract.custom_rules && Object.keys(contract.custom_rules).length > 0 && (
-          <div className="mt-4 p-3 bg-gray-50 border border-gray-100 rounded-xl text-left">
-            <span className="text-[10px] font-mono font-semibold text-indigo-600 uppercase block mb-1">CUSTOM RULES</span>
             <div className="space-y-1">
-              {Array.isArray(contract.custom_rules) ? (
-                contract.custom_rules.map((rule: any, i: number) => (
-                  <div key={i} className="flex justify-between items-center text-xs text-gray-500 font-mono">
-                    <span className="truncate max-w-[120px]">{rule.name}</span>
-                    <span className="font-semibold text-amber-600">{rule.value} ({rule.type})</span>
-                  </div>
-                ))
-              ) : (
-                Object.entries(contract.custom_rules).map(([key, val]) => (
-                  <div key={key} className="flex justify-between items-center text-xs text-gray-500 font-mono">
-                    <span>{key.replace(/_/g, ' ')}</span>
-                    <span className="font-semibold text-amber-600">{String(val)}</span>
-                  </div>
-                ))
+              {displayItems.map((item, i) => (
+                <div key={i} className="flex justify-between items-center text-xs">
+                  <span className="text-gray-600 truncate max-w-[140px]" title={item.name}>
+                    {item.name}
+                  </span>
+                  <span className={`font-mono font-semibold ${item.rate_type === 'Not Allowed' ? 'text-red-400' : 'text-gray-900'}`}>
+                    {formatRate(item.rate, item.rate_type)}
+                    {item.rate_type !== 'Not Allowed' && (
+                      <span className="text-gray-400 font-normal ml-0.5">{rateTypeShort(item.rate_type)}</span>
+                    )}
+                  </span>
+                </div>
+              ))}
+              {remaining > 0 && (
+                <p className="text-[10px] text-gray-400 pt-1">+{remaining} more items</p>
               )}
             </div>
           </div>
@@ -149,9 +137,7 @@ export default function ContractCard({ contract, onEdit, onDelete }: ContractCar
       {showConfirmDelete && (
         <div className="absolute inset-0 bg-white/95 backdrop-blur-sm p-4 flex flex-col justify-center items-center text-center z-20 animate-fade-in rounded-2xl">
           <AlertTriangle className="text-red-500 h-8 w-8 mb-2" />
-          <h4 className="text-sm font-semibold text-gray-900">
-            Confirm Delete
-          </h4>
+          <h4 className="text-sm font-semibold text-gray-900">Confirm Delete</h4>
           <p className="text-xs text-gray-500 leading-relaxed max-w-[170px] mt-1 mb-4">
             Are you sure you want to permanently delete {contract.carrier_name}?
           </p>

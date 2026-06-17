@@ -28,6 +28,8 @@ export default function DisputeDetailPage({ disputeId: propDisputeId, onBack }: 
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [resolutionAmount, setResolutionAmount] = useState<number>(0);
+  const [resolutionOutcome, setResolutionOutcome] = useState<string>('full_credit');
+  const [resolutionNotes, setResolutionNotes] = useState<string>('');
   const [isResolving, setIsResolving] = useState(false);
 
   useEffect(() => {
@@ -53,6 +55,9 @@ export default function DisputeDetailPage({ disputeId: propDisputeId, onBack }: 
         setLineItems(data.lineItems || []);
         setLetterText(data.dispute.dispute_letter_text || '');
         setCarrierEmail(data.dispute.carrier_email || '');
+        setResolutionAmount(data.dispute.resolution_amount || data.dispute.total_disputed_amount || 0);
+        setResolutionOutcome(data.dispute.resolution_outcome || 'full_credit');
+        setResolutionNotes(data.dispute.resolution_notes || '');
       }
     } catch (err) {
       console.error(err);
@@ -155,10 +160,15 @@ export default function DisputeDetailPage({ disputeId: propDisputeId, onBack }: 
       const res = await fetch(`/api/disputes/${disputeId}/resolve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resolution_amount: resolutionAmount }),
+        body: JSON.stringify({
+          resolution_amount: resolutionAmount,
+          resolution_outcome: resolutionOutcome,
+          resolution_notes: resolutionNotes,
+        }),
       });
       if (!res.ok) throw new Error("Resolve failed");
       await loadDisputeData();
+      window.dispatchEvent(new CustomEvent('invoices-updated'));
       triggerToast("Dispute Resolved", `Credit of $${resolutionAmount.toFixed(2)} recorded successfully.`);
     } catch (err: any) {
       triggerToast("Resolution Failed", err.message);
@@ -421,21 +431,72 @@ export default function DisputeDetailPage({ disputeId: propDisputeId, onBack }: 
             {isSent && !isResolved && (
               <div className="space-y-3 border-t border-gray-100 pt-4">
                 <label className="block text-[9px] font-semibold font-mono text-gray-500 uppercase tracking-wider">
-                  Resolution Amount ($)
+                  What was the outcome?
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  value={resolutionAmount || ''}
-                  onChange={(e) => setResolutionAmount(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 bg-gray-50 text-gray-900 border border-gray-200 rounded-lg text-xs font-mono focus:outline-none focus:border-green-400 transition-all"
-                  id="resolution-amount-field"
-                />
+
+                <div className="space-y-1.5">
+                  {[
+                    { value: 'full_credit', label: 'Carrier agreed — full amount credited' },
+                    { value: 'partial_credit', label: 'Carrier agreed — partial credit only' },
+                    { value: 'accepted_charge', label: 'We accepted the charge — no credit' },
+                    { value: 'dispute_withdrawn', label: 'Dispute withdrawn' },
+                  ].map((option) => (
+                    <label
+                      key={option.value}
+                      className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                        resolutionOutcome === option.value
+                          ? 'bg-green-50 border-green-200 text-green-700'
+                          : 'bg-gray-50 border-gray-100 text-gray-500 hover:border-gray-200'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="resolution_outcome"
+                        value={option.value}
+                        checked={resolutionOutcome === option.value}
+                        onChange={(e) => setResolutionOutcome(e.target.value)}
+                        className="mt-0.5 accent-green-600"
+                      />
+                      <span className="text-[11px]">{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {(resolutionOutcome === 'full_credit' || resolutionOutcome === 'partial_credit') && (
+                  <div className="animate-fade-in space-y-1.5">
+                    <label className="block text-[9px] font-semibold font-mono text-gray-500 uppercase tracking-wider">
+                      Agreed credit amount ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={resolutionAmount || ''}
+                      onChange={(e) => setResolutionAmount(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 bg-gray-50 text-gray-900 border border-gray-200 rounded-lg text-xs font-mono focus:outline-none focus:border-green-400 transition-all"
+                      id="resolution-amount-field"
+                    />
+                  </div>
+                )}
+
+                <div className="animate-fade-in space-y-1.5">
+                  <label className="block text-[9px] font-semibold font-mono text-gray-500 uppercase tracking-wider">
+                    Resolution notes <span className="text-gray-300 normal-case">(optional)</span>
+                  </label>
+                  <textarea
+                    value={resolutionNotes}
+                    onChange={(e) => setResolutionNotes(e.target.value)}
+                    placeholder="e.g. Spoke with John at FedEx billing on June 12, agreed to $150 credit"
+                    rows={2}
+                    className="w-full px-3 py-2 bg-gray-50 text-gray-900 border border-gray-200 rounded-lg text-xs font-mono focus:outline-none focus:border-green-400 transition-all resize-none"
+                    id="resolution-notes-field"
+                  />
+                </div>
+
                 <button
                   onClick={handleResolveDispute}
-                  disabled={isResolving || resolutionAmount <= 0}
+                  disabled={isResolving || (resolutionAmount <= 0 && (resolutionOutcome === 'full_credit' || resolutionOutcome === 'partial_credit'))}
                   className="w-full py-2.5 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-[10px] font-mono uppercase tracking-wider shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
                   id="resolve-dispute-action"
                 >
@@ -507,6 +568,19 @@ export default function DisputeDetailPage({ disputeId: propDisputeId, onBack }: 
                     <div className="mt-1 space-y-1">
                       <p className="text-[10px] font-mono font-medium text-indigo-600">{formatDate(dispute.resolved_at)}</p>
                       <p className="text-[10px] font-bold text-green-600 font-mono">Recovered Cash: {formatMoney(dispute.resolution_amount)}</p>
+                      {dispute.resolution_outcome && (
+                        <p className="text-[10px] text-gray-500 font-mono">
+                          Outcome: {{
+                            full_credit: 'Full amount credited',
+                            partial_credit: 'Partial credit applied',
+                            accepted_charge: 'Charge accepted — no credit',
+                            dispute_withdrawn: 'Dispute withdrawn',
+                          }[dispute.resolution_outcome] || dispute.resolution_outcome}
+                        </p>
+                      )}
+                      {dispute.resolution_notes && (
+                        <p className="text-[9px] text-gray-400 font-mono italic">&ldquo;{dispute.resolution_notes}&rdquo;</p>
+                      )}
                     </div>
                   )}
                 </div>

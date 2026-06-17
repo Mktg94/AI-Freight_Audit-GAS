@@ -60,7 +60,6 @@ export async function POST(request: Request) {
           limitData = orgDetail;
         }
       }
-      }
     } catch {
       if (!orgId) {
         return NextResponse.json({ error: "Organization not found" }, { status: 404 });

@@ -12,6 +12,7 @@ import { LineItem, Contract } from '@/types';
 import ConfidenceBar from '../shared/ConfidenceBar';
 import InvoiceStatusBadge from './InvoiceStatusBadge';
 import AuditResultPanel from './AuditResultPanel';
+import ApprovalReasonModal from './ApprovalReasonModal';
 
 interface LineItemTableProps {
   lineItems: LineItem[];
@@ -29,9 +30,24 @@ export default function LineItemTable({
   const [selectedLineItem, setSelectedLineItem] = useState<LineItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [pendingApprovalItem, setPendingApprovalItem] = useState<LineItem | null>(null);
 
-  const handleQuickStatusUpdate = async (e: React.MouseEvent, itemId: string, newStatus: 'approved' | 'disputed') => {
+  const handleQuickStatusUpdate = async (
+    e: React.MouseEvent,
+    itemId: string,
+    newStatus: 'approved' | 'disputed',
+    itemDiscrepancy?: number,
+    itemData?: LineItem,
+    approvalReason?: string,
+    approvalNotes?: string,
+  ) => {
     e.stopPropagation();
+
+    if (newStatus === 'approved' && itemDiscrepancy && itemDiscrepancy > 0 && itemData && !approvalReason) {
+      setPendingApprovalItem(itemData);
+      return;
+    }
+
     setActionLoadingId(`${itemId}-${newStatus}`);
 
     try {
@@ -40,7 +56,7 @@ export default function LineItemTable({
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ status: newStatus, approval_reason: approvalReason, approval_notes: approvalNotes })
       });
 
       if (!response.ok) {
@@ -144,20 +160,20 @@ export default function LineItemTable({
 
         return (
           <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-            {rowData.status !== 'approved' && (
-              <button
-                onClick={(e) => handleQuickStatusUpdate(e, rowData.id, 'approved')}
-                disabled={actionLoadingId !== null}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 font-medium rounded-lg transition-all cursor-pointer disabled:opacity-50"
-              >
-                {isApproveLoading ? (
-                  <Loader2 size={10} className="animate-spin" />
-                ) : (
-                  <Check size={10} />
-                )}
-                <span>Approve</span>
-              </button>
-            )}
+              {rowData.status !== 'approved' && (
+                <button
+                  onClick={(e) => handleQuickStatusUpdate(e, rowData.id, 'approved', rowData.discrepancy, rowData)}
+                  disabled={actionLoadingId !== null}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 font-medium rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isApproveLoading ? (
+                    <Loader2 size={10} className="animate-spin" />
+                  ) : (
+                    <Check size={10} />
+                  )}
+                  <span>Approve</span>
+                </button>
+              )}
 
             {rowData.status !== 'disputed' && (
               <button
@@ -267,6 +283,27 @@ export default function LineItemTable({
         contract={contract}
         onStatusUpdated={handleStatusUpdatedInDrawer}
       />
+
+      {pendingApprovalItem && (
+        <ApprovalReasonModal
+          description={pendingApprovalItem.description}
+          discrepancy={pendingApprovalItem.discrepancy}
+          onConfirm={(reason, notes) => {
+            const item = pendingApprovalItem;
+            setPendingApprovalItem(null);
+            handleQuickStatusUpdate(
+              {} as React.MouseEvent,
+              item.id,
+              'approved',
+              item.discrepancy,
+              item,
+              reason,
+              notes,
+            );
+          }}
+          onCancel={() => setPendingApprovalItem(null)}
+        />
+      )}
     </div>
   );
 }

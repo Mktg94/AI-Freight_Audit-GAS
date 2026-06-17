@@ -28,6 +28,7 @@
     "app",
     "lib/supabase",
     "lib/auth",
-    "middleware.ts"
+    "middleware.ts",
+    "src"
   ]
 }

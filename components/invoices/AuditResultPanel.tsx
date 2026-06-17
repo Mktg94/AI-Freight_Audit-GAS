@@ -6,6 +6,7 @@ import { X, ArrowRight, Info, CheckCircle2, AlertOctagon, Loader2 } from 'lucide
 import { LineItem, Contract } from '@/types';
 import ConfidenceBar from '../shared/ConfidenceBar';
 import PermissionGate from '../shared/PermissionGate';
+import ApprovalReasonModal from './ApprovalReasonModal';
 
 
 interface AuditResultPanelProps {
@@ -25,10 +26,11 @@ export default function AuditResultPanel({
 }: AuditResultPanelProps) {
   const [loadingAction, setLoadingAction] = useState<'approve' | 'dispute' | null>(null);
   const [errorFeedback, setErrorFeedback] = useState<string | null>(null);
+  const [showApprovalReason, setShowApprovalReason] = useState(false);
 
   if (!lineItem) return null;
 
-  const handleUpdateStatus = async (status: 'approved' | 'disputed') => {
+  const handleUpdateStatus = async (status: 'approved' | 'disputed', approvalReason?: string, approvalNotes?: string) => {
     setLoadingAction(status === 'approved' ? 'approve' : 'dispute');
     setErrorFeedback(null);
 
@@ -38,7 +40,11 @@ export default function AuditResultPanel({
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({
+          status,
+          approval_reason: approvalReason,
+          approval_notes: approvalNotes,
+        })
       });
 
       if (!response.ok) {
@@ -72,29 +78,38 @@ export default function AuditResultPanel({
   const getContractViolationString = () => {
     if (!contract) return 'Comparison agreement missing.';
     const descLower = lineItem.description.toLowerCase();
+    const items = contract.charge_items || [];
 
-    if (descLower.includes('base') || descLower.includes('transit') || descLower.includes('freight rate')) {
-      return `Section 2.1: Base rates cap transit costs at $${contract.base_rate_per_lb.toFixed(4)}/lb and $${contract.base_rate_per_mile.toFixed(2)}/mile, minimum transit fee $${contract.minimum_charge}.`;
+    const match = items.find(ci => {
+      const cl = ci.name.toLowerCase();
+      if (descLower.includes(cl)) return true;
+      if (cl.includes('detention') && (descLower.includes('detention') || descLower.includes('waiting') || descLower.includes('standby'))) return true;
+      if (cl.includes('fuel') && descLower.includes('fuel')) return true;
+      if (cl.includes('residential') && descLower.includes('residential')) return true;
+      if (cl.includes('liftgate') && (descLower.includes('liftgate') || descLower.includes('lift-gate'))) return true;
+      if (cl.includes('inside') && descLower.includes('inside')) return true;
+      if (cl.includes('redelivery') && (descLower.includes('redelivery') || descLower.includes('attempt'))) return true;
+      if ((cl.includes('base') || cl.includes('freight')) && (descLower.includes('base') || descLower.includes('freight') || descLower.includes('transit'))) return true;
+      return false;
+    });
+
+    if (match) {
+      if (match.rate_type === 'Not Allowed') {
+        return `Contract: "${match.name}" is marked as Not Allowed. This charge should not appear.`;
+      }
+      if (match.rate_type === 'Flat fee per occurrence') {
+        return `Contract: "${match.name}" — flat fee of $${Number(match.rate).toFixed(2)} per occurrence.`;
+      }
+      if (match.rate_type === 'Percentage of base freight charge') {
+        return `Contract: "${match.name}" — ${match.rate}% of base freight charge.`;
+      }
+      return `Contract: "${match.name}" — $${Number(match.rate)} ${match.rate_type}.`;
     }
-    if (descLower.includes('fuel') || descLower.includes('surcharge')) {
-      return `Section 4.3: Fuel surcharge index caps adjustments at ${contract.fuel_surcharge_pct}% of total transportation charge.`;
-    }
-    if (descLower.includes('liftgate') || descLower.includes('lift-gate')) {
-      return `Schedule A: Accessorial Liftgate fee caps rate sheet at a flat $${contract.liftgate_fee}.`;
-    }
-    if (descLower.includes('residential') || descLower.includes('home')) {
-      return `Schedule A: Residential delivery surcharge caps rate sheet at a flat $${contract.residential_surcharge}.`;
-    }
-    if (descLower.includes('detention') || descLower.includes('waiting')) {
-      return `Schedule B: Detention and carrier standby rate of $${contract.detention_rate_per_hr}/hour after 2 free hours.`;
-    }
-    if (descLower.includes('inside') || descLower.includes('dock')) {
-      return `Schedule A: Inside carrier delivery fee caps rate sheet at a flat $${contract.inside_delivery_fee}.`;
-    }
-    if (descLower.includes('redelivery') || descLower.includes('attempt')) {
-      return `Schedule A: Carrier attempt redelivery rate caps at a flat $${contract.redelivery_fee}.`;
-    }
-    return `General Rate Agreement: All unlisted accessorial charges require pre-authorization and are capped at standard carrier tariff schedules.`;
+
+    const minCharge = Number(contract.minimum_charge) || 0;
+    return minCharge > 0
+      ? `General Rate Agreement: Minimum charge $${minCharge.toFixed(2)}. All other charges are capped at standard carrier tariff schedules.`
+      : 'General Rate Agreement: All charges capped at standard carrier tariff schedules.';
   };
 
   // Safe checks for status styling
@@ -116,27 +131,28 @@ export default function AuditResultPanel({
   const statusInfo = statusConfig[lineItem.status] || statusConfig.pending;
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Slide Backdrop with motion */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.4 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black z-[100] cursor-pointer"
-            id="audit-result-backdrop"
-          />
+    <>
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            {/* Slide Backdrop with motion */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              onClick={onClose}
+              className="fixed inset-0 bg-black z-[100] cursor-pointer"
+              id="audit-result-backdrop"
+            />
 
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-            className="fixed top-0 right-0 h-full max-w-[480px] w-full bg-white border-l border-gray-100 shadow-xl z-[101] flex flex-col justify-between"
-            id="audit-result-panel"
-          >
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 220 }}
+              className="fixed top-0 right-0 h-full max-w-[480px] w-full bg-white border-l border-gray-100 shadow-xl z-[101] flex flex-col justify-between"
+              id="audit-result-panel"
+            >
             <div className="px-6 py-4 border-b border-gray-100 flex items-start justify-between">
               <div className="space-y-2 max-w-[340px]">
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium font-mono ${statusInfo.style}`}>
@@ -258,7 +274,13 @@ export default function AuditResultPanel({
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => handleUpdateStatus('approved')}
+                    onClick={() => {
+                      if (lineItem.discrepancy > 0) {
+                        setShowApprovalReason(true);
+                      } else {
+                        handleUpdateStatus('approved');
+                      }
+                    }}
                     disabled={loadingAction !== null}
                     className="w-full py-2.5 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 font-medium rounded-xl text-sm text-center flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                   >
@@ -291,5 +313,18 @@ export default function AuditResultPanel({
         </>
       )}
     </AnimatePresence>
+
+    {showApprovalReason && lineItem && (
+      <ApprovalReasonModal
+        description={lineItem.description}
+        discrepancy={lineItem.discrepancy}
+        onConfirm={(reason, notes) => {
+          setShowApprovalReason(false);
+          handleUpdateStatus('approved', reason, notes);
+        }}
+        onCancel={() => setShowApprovalReason(false)}
+      />
+    )}
+    </>
   );
 }

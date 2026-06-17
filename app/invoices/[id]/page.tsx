@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, FileText, Calendar, Truck, Anchor, 
-  Scale, Navigation, ShieldAlert, Sparkles, CheckCheck, Loader2, Download
+  Scale, Navigation, ShieldAlert, Sparkles, CheckCheck, Loader2, Download,
+  CheckCircle2, Clock, Send, AlertTriangle
 } from 'lucide-react';
-import { Invoice, LineItem, Contract } from '@/types';
+import { Invoice, LineItem, Contract, Dispute } from '@/types';
 import InvoiceStatusBadge from '@/components/invoices/InvoiceStatusBadge';
 import LineItemTable from '@/components/invoices/LineItemTable';
 
@@ -20,6 +21,7 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [contract, setContract] = useState<Contract | null>(null);
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [loading, setLoading] = useState(true);
   const [approvingClean, setApprovingClean] = useState(false);
   const [generatingDispute, setGeneratingDispute] = useState(false);
@@ -43,6 +45,12 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
         setContract(data.contract);
       } else {
         throw new Error(data.error || 'Server structure resolved with errors.');
+      }
+
+      const dispRes = await fetch(`/api/disputes?invoice_id=${resolvedId}`);
+      if (dispRes.ok) {
+        const dispData = await dispRes.json();
+        if (dispData.success) setDisputes(dispData.data || []);
       }
     } catch (err: any) {
       console.error(err);
@@ -181,6 +189,51 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
 
   const hasCleanPendingItems = cleanPendingCount > 0;
 
+  const flaggedCount = lineItems.filter(
+    item => item.status === 'pending' && item.discrepancy > 0
+  ).length;
+
+  const sentDispute = disputes.find(d => d.status === 'sent');
+  const resolvedDispute = disputes.find(d => d.status === 'resolved');
+  const allApproved = lineItems.length > 0 && lineItems.every(item => item.status === 'approved');
+  const allReviewedWithoutFlags = lineItems.length > 0 && lineItems.every(
+    item => item.status === 'approved' || (item.status === 'pending' && item.discrepancy === 0)
+  );
+
+  let statusBanner: { label: string; style: string; icon: React.ReactNode } | null = null;
+
+  if (resolvedDispute) {
+    statusBanner = {
+      label: `Resolved — ${resolvedDispute.resolution_amount?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} credited`,
+      style: 'bg-green-50 border-green-200 text-green-700',
+      icon: <CheckCircle2 size={16} />,
+    };
+  } else if (sentDispute) {
+    statusBanner = {
+      label: 'Dispute sent — awaiting carrier response',
+      style: 'bg-blue-50 border-blue-200 text-blue-700',
+      icon: <Send size={16} />,
+    };
+  } else if (allApproved) {
+    statusBanner = {
+      label: 'Reviewed and approved',
+      style: 'bg-green-50 border-green-200 text-green-700',
+      icon: <CheckCircle2 size={16} />,
+    };
+  } else if (flaggedCount === 0 && allReviewedWithoutFlags) {
+    statusBanner = {
+      label: 'No discrepancies found',
+      style: 'bg-green-50 border-green-200 text-green-700',
+      icon: <CheckCircle2 size={16} />,
+    };
+  } else if (flaggedCount > 0) {
+    statusBanner = {
+      label: `${flaggedCount} item${flaggedCount > 1 ? 's' : ''} need review`,
+      style: 'bg-amber-50 border-amber-200 text-amber-700',
+      icon: <AlertTriangle size={16} />,
+    };
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[450px] space-y-4" id="detail-page-loader">
@@ -299,6 +352,13 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
           )}
         </div>
       </div>
+
+      {statusBanner && (
+        <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border ${statusBanner.style}`}>
+          {statusBanner.icon}
+          <span className="text-sm font-medium">{statusBanner.label}</span>
+        </div>
+      )}
 
       <div className="bg-white border border-gray-100 rounded-2xl p-6" id="invoice-metadata-deck">
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-5 text-left">

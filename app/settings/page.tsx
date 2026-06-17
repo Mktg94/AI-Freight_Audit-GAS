@@ -15,7 +15,7 @@ import InviteMemberForm from '@/components/settings/InviteMemberForm';
 
 export default function SettingsPage() {
   const { role: simulatedRole, setRole: setSimulatedRole } = useRole();
-  const [activeTab, setActiveTab] = useState<'organization' | 'integrations' | 'appearance' | 'account' | 'roles' | 'team' | 'billing'>('organization');
+  const [activeTab, setActiveTab] = useState<'organization' | 'integrations' | 'appearance' | 'account' | 'roles' | 'team' | 'billing' | 'data-privacy'>('organization');
   const [loadingOrg, setLoadingOrg] = useState(false);
   const [loadingIntegrations, setLoadingIntegrations] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
@@ -360,6 +360,19 @@ export default function SettingsPage() {
             )}
           </button>
         )}
+
+        <button
+          onClick={() => setActiveTab('data-privacy')}
+          className={`pb-3 px-5 relative transition-all cursor-pointer ${
+            activeTab === 'data-privacy' ? 'text-indigo-600 font-bold' : 'hover:text-gray-600 text-gray-400'
+          }`}
+          id="data-privacy-tab-header-btn"
+        >
+          <span>Data & Privacy</span>
+          {activeTab === 'data-privacy' && (
+            <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-indigo-600" />
+          )}
+        </button>
       </div>
 
       <div className="mt-4" id="settings-tab-viewports">
@@ -1265,6 +1278,75 @@ export default function SettingsPage() {
 
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'data-privacy' && (
+          <div className="space-y-6 animate-fade-in" id="data-privacy-tabpanel">
+            <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 space-y-5">
+              <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+                <ShieldCheck className="text-indigo-600" size={20} />
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 tracking-tight">Data & Privacy</h3>
+                  <p className="text-[10px] text-gray-400 font-mono mt-0.5">HOW YOUR DATA IS PROCESSED AND PROTECTED</p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-5 text-sm text-gray-600 leading-relaxed space-y-3">
+                <p>
+                  Your invoice and contract data is processed by Google Gemini to detect
+                  billing discrepancies. We send only the charge descriptions and amounts —
+                  not company names or personal details.
+                </p>
+                <p>
+                  Google's API terms state that data submitted via the API is not used to
+                  train their models.
+                </p>
+                <p className="text-xs text-gray-400">
+                  See our Privacy Policy for full details.
+                </p>
+              </div>
+
+              <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-5 space-y-3">
+                <h4 className="text-xs font-semibold text-gray-900">What we send to Gemini AI</h4>
+                <ul className="text-xs text-gray-600 space-y-1.5">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 size={14} className="text-green-500 shrink-0 mt-0.5" />
+                    <span>Charge descriptions and billed amounts from invoice line items</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 size={14} className="text-green-500 shrink-0 mt-0.5" />
+                    <span>Contract rate tables (charge item name, rate, and rate type)</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-5 space-y-3">
+                <h4 className="text-xs font-semibold text-gray-900">What we do NOT send</h4>
+                <ul className="text-xs text-gray-600 space-y-1.5">
+                  <li className="flex items-start gap-2">
+                    <XCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
+                    <span>Shipper or consignee company names and addresses</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <XCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
+                    <span>Driver names, contact names, phone numbers, or email addresses</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <XCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
+                    <span>Invoice numbers, PRO numbers, or shipment references</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <XCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
+                    <span>Internal organization notes or metadata (who created/edited records)</span>
+                  </li>
+                </ul>
+              </div>
+
+              <p className="text-[10px] text-gray-400 text-center pt-2">
+                Data minimization is applied automatically before any information reaches the AI model.
+              </p>
+            </div>
           </div>
         )}
 

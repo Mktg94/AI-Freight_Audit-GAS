@@ -89,16 +89,9 @@ app.post("/api/contracts", async (req, res) => {
         carrier_name: payload.carrier_name,
         effective_date: payload.effective_date,
         expiry_date: payload.expiry_date,
-        base_rate_per_lb: Number(payload.base_rate_per_lb) || 0,
-        base_rate_per_mile: Number(payload.base_rate_per_mile) || 0,
         minimum_charge: Number(payload.minimum_charge) || 0,
-        fuel_surcharge_pct: Number(payload.fuel_surcharge_pct) || 0,
-        residential_surcharge: Number(payload.residential_surcharge) || 0,
-        liftgate_fee: Number(payload.liftgate_fee) || 0,
-        detention_rate_per_hr: Number(payload.detention_rate_per_hr) || 0,
-        inside_delivery_fee: Number(payload.inside_delivery_fee) || 0,
-        redelivery_fee: Number(payload.redelivery_fee) || 0,
-        custom_rules: payload.custom_rules || [],
+        currency: payload.currency || 'USD',
+        charge_items: payload.charge_items || [],
       })
       .select()
       .single();
@@ -684,7 +677,7 @@ app.patch("/api/line-items/:id", express.json(), async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, approval_reason, approval_notes } = req.body;
 
     if (status !== "approved" && status !== "disputed") {
       return res.status(400).json({ error: "Invalid status" });
@@ -697,6 +690,8 @@ app.patch("/api/line-items/:id", express.json(), async (req, res) => {
     if (req.body.user_id) {
       updatePayload.reviewed_by = req.body.user_id;
     }
+    if (approval_reason) updatePayload.approval_reason = approval_reason;
+    if (approval_notes) updatePayload.approval_notes = approval_notes;
 
     const { data: updatedItem, error: updateError } = await supabase
       .from("line_items")
@@ -821,96 +816,99 @@ app.post("/api/invoices/:id/approve-clean", async (req, res) => {
 });
 
 function performRulesBasedAudit(invoice: any, contract: any) {
-  const weight = Number(invoice.weight_lbs) || 0;
-  const distance = Number(invoice.distance_miles) || 0;
-  const contractBaseLb = Number(contract.base_rate_per_lb) || 0.15;
-  const contractBaseMile = Number(contract.base_rate_per_mile) || 1.85;
-  const fuelPct = Number(contract.fuel_surcharge_pct) || 0.12;
-  const minCharge = Number(contract.minimum_charge) || 150.0;
-
-  const wtCalcRating = weight * contractBaseLb;
-  const distCalcRating = distance * contractBaseMile;
-  let expectedBase = Math.max(wtCalcRating, distCalcRating);
-  if (expectedBase < minCharge) expectedBase = minCharge;
-
-  const expectedFuel = Math.round(expectedBase * fuelPct * 100) / 100;
-  let expectedAccessorial = 0;
+  const chargeItems: Array<{ name: string; rate: number; rate_type: string }> = contract.charge_items || [];
+  const minCharge = Number(contract.minimum_charge) || 0;
   const discrepancies: any[] = [];
   const rawItems = invoice.extracted_data?.line_items || [];
 
+  const findMatchingCharge = (desc: string): { name: string; rate: number; rate_type: string } | null => {
+    const dl = desc.toLowerCase();
+    for (const ci of chargeItems) {
+      const cl = ci.name.toLowerCase();
+      if (dl.includes(cl)) return ci;
+      if (cl.includes("detention") && (dl.includes("detention") || dl.includes("waiting") || dl.includes("standby"))) return ci;
+      if (cl.includes("residential") && dl.includes("residential")) return ci;
+      if (cl.includes("liftgate") && (dl.includes("liftgate") || dl.includes("lift-gate"))) return ci;
+      if (cl.includes("fuel") && dl.includes("fuel")) return ci;
+      if (cl.includes("base") && (dl.includes("base") || dl.includes("freight"))) return ci;
+      if (cl.includes("inside") && dl.includes("inside")) return ci;
+      if (cl.includes("redelivery") && (dl.includes("redeliv") || dl.includes("re-deliv"))) return ci;
+    }
+    return null;
+  };
+
   rawItems.forEach((item: any) => {
-    const desc = item.description.toLowerCase();
+    const desc = item.description || "";
     const billed = Number(item.billed_amount) || 0;
 
-    if (desc.includes("base") || desc.includes("freight") || desc.includes("shipping") || desc.includes("haul")) {
-      const diff = Math.max(0, billed - expectedBase);
-      discrepancies.push({
-        item_description: item.description,
-        billed,
-        expected: expectedBase,
-        difference: diff,
-        type: diff > 2.0 ? "overcharged" : "correct",
-        reason: diff > 2.0
-          ? `Billed base $${billed.toFixed(2)} exceeds contract formula. Expected: $${expectedBase.toFixed(2)}.`
-          : "Rated correctly under contract guidelines.",
-      });
-    } else if (desc.includes("fuel")) {
-      const diff = Math.max(0, billed - expectedFuel);
-      discrepancies.push({
-        item_description: item.description,
-        billed,
-        expected: expectedFuel,
-        difference: diff,
-        type: diff > 2.0 ? "overcharged" : "correct",
-        reason: diff > 2.0
-          ? `Billed fuel $${billed.toFixed(2)} exceeds contract cap of ${fuelPct * 100}%. Expected: $${expectedFuel.toFixed(2)}.`
-          : "Matches fuel percentage surcharge terms.",
-      });
-    } else {
-      let contractFee = 0;
-      let feeName = "";
-      if (desc.includes("residential")) { contractFee = Number(contract.residential_surcharge) || 0; feeName = "Residential Surcharge"; }
-      else if (desc.includes("liftgate") || desc.includes("lift-gate")) { contractFee = Number(contract.liftgate_fee) || 0; feeName = "Liftgate Fee"; }
-      else if (desc.includes("inside")) { contractFee = Number(contract.inside_delivery_fee) || 0; feeName = "Inside Delivery"; }
-      else if (desc.includes("redeliv") || desc.includes("re-deliv")) { contractFee = Number(contract.redelivery_fee) || 0; feeName = "Redelivery"; }
-      else if (desc.includes("detention") || desc.includes("waiting")) { contractFee = Number(contract.detention_rate_per_hr) || 0; feeName = "Detention"; }
+    const matched = findMatchingCharge(desc);
 
-      expectedAccessorial += contractFee;
-      if (contractFee === 0 && billed > 0) {
-        discrepancies.push({
-          item_description: item.description,
-          billed,
-          expected: 0,
-          difference: billed,
-          type: "not_in_contract",
-          reason: `Charge '${item.description}' ($${billed.toFixed(2)}) is not defined in the contract.`,
-        });
-      } else {
-        const diff = Math.max(0, billed - contractFee);
-        discrepancies.push({
-          item_description: item.description,
-          billed,
-          expected: contractFee,
-          difference: diff,
-          type: diff > 1.0 ? "overcharged" : "correct",
-          reason: diff > 1.0
-            ? `${feeName} contracted at $${contractFee.toFixed(2)}. Billed: $${billed.toFixed(2)}.`
-            : `Rate matches negotiated schedule ($${contractFee.toFixed(2)}).`,
-        });
-      }
+    if (!matched) {
+      const diff = billed > 0 ? billed : 0;
+      discrepancies.push({
+        item_description: item.description,
+        billed,
+        expected: 0,
+        difference: diff,
+        type: billed > 0 ? "not_in_contract" : "correct",
+        reason: billed > 0
+          ? `Charge '${item.description}' ($${billed.toFixed(2)}) is not defined in the contract.`
+          : "No charge reported for this item.",
+      });
+      return;
     }
+
+    if (matched.rate_type === "Not Allowed") {
+      discrepancies.push({
+        item_description: item.description,
+        billed,
+        expected: 0,
+        difference: billed,
+        type: "overcharged",
+        reason: `${matched.name} is marked "Not Allowed" in the contract. Billed: $${billed.toFixed(2)}.`,
+      });
+      return;
+    }
+
+    let expected = 0;
+    if (matched.rate_type === "Flat fee per occurrence") {
+      expected = matched.rate;
+    } else if (matched.rate_type === "Percentage of base freight charge") {
+      const baseItem = rawItems.find((ri: any) => {
+        const rd = (ri.description || "").toLowerCase();
+        return rd.includes("base") || rd.includes("freight");
+      });
+      const baseAmount = baseItem ? Number(baseItem.billed_amount) || 0 : expected;
+      expected = baseAmount * (matched.rate / 100);
+    } else if (matched.rate_type.startsWith("Per ")) {
+      expected = matched.rate * (Number(item.quantity) || 1);
+    } else {
+      expected = matched.rate;
+    }
+
+    const diff = Math.max(0, billed - expected);
+    discrepancies.push({
+      item_description: item.description,
+      billed,
+      expected,
+      difference: diff,
+      type: diff > 1.0 ? "overcharged" : "correct",
+      reason: diff > 1.0
+        ? `${matched.name} contracted at $${matched.rate} (${matched.rate_type}). Billed: $${billed.toFixed(2)}.`
+        : `Matches negotiated rate ($${matched.rate} ${matched.rate_type}).`,
+    });
   });
 
-  const calculated_total_expected = expectedBase + expectedFuel + expectedAccessorial;
-  const overchargedLogs = discrepancies.filter((d) => d.type === "overcharged" || d.type === "not_in_contract");
-  const total_discrepancy = overchargedLogs.reduce((sum, item) => sum + item.difference, 0);
+  const calculated_total_expected = discrepancies.reduce((sum: number, d: any) => sum + (Number(d.expected) || 0), 0);
+  const overchargedLogs = discrepancies.filter((d: any) => d.type === "overcharged" || d.type === "not_in_contract");
+  const total_discrepancy = overchargedLogs.reduce((sum: number, item: any) => sum + item.difference, 0);
 
   return {
     invoice_id: invoice.id,
     status: total_discrepancy > 5.0 ? "flagged" : "passed",
-    calculated_base_rate: expectedBase,
-    calculated_fuel_surcharge: expectedFuel,
-    calculated_accessorial_fees: expectedAccessorial,
+    calculated_base_rate: 0,
+    calculated_fuel_surcharge: 0,
+    calculated_accessorial_fees: 0,
     calculated_total_expected,
     total_discrepancy,
     confidence_score: 0.98,
@@ -1173,6 +1171,9 @@ app.post("/api/disputes/:id/resolve", async (req, res) => {
     const supabase = getSupabaseAdmin();
     const { id } = req.params;
     const resolutionAmount = Number(req.body.resolution_amount) || 0;
+    const resolutionOutcome = req.body.resolution_outcome || 'full_credit';
+    const resolutionNotes = req.body.resolution_notes || '';
+    const resolvedBy = req.body.resolved_by || null;
 
     const { data: dispute, error: fetchErr } = await supabase
       .from("disputes")
@@ -1187,6 +1188,9 @@ app.post("/api/disputes/:id/resolve", async (req, res) => {
         status: "resolved",
         resolved_at: new Date().toISOString(),
         resolution_amount: resolutionAmount,
+        resolution_outcome: resolutionOutcome,
+        resolution_notes: resolutionNotes,
+        resolved_by: resolvedBy,
       })
       .eq("id", id);
     if (updateErr) throw updateErr;
@@ -1205,6 +1209,7 @@ app.post("/api/disputes/:id/resolve", async (req, res) => {
           status: "approved",
           total_approved: totalApproved,
           total_savings: resolutionAmount,
+          resolved_by: resolvedBy,
         })
         .eq("id", dispute.invoice_id);
     }

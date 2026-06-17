@@ -1,17 +1,75 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Contract } from '@/types';
+import { Contract, ChargeItem, RateType } from '@/types';
 import { 
-  FileSignature, Plus, X, 
-  ArrowLeft, Save, ShieldAlert
+  Plus, X, ArrowLeft, Save, Truck, Plane, Ship, FileSignature
 } from 'lucide-react';
 
-interface CustomRuleItem {
+const RATE_TYPES: RateType[] = [
+  'Per lb', 'Per kg', 'Per mile', 'Per km', 'Per hour', 'Per CBM',
+  'Flat fee per occurrence',
+  'Percentage of base freight charge',
+  'Percentage of cargo value',
+  'Not Allowed',
+];
+
+interface TemplateDefinition {
   name: string;
-  value: string;
-  type: 'Fixed Fee' | 'Percentage' | 'Not Allowed';
+  icon: React.ReactNode;
+  description: string;
+  items: ChargeItem[];
 }
+
+const TEMPLATES: Record<string, TemplateDefinition> = {
+  road: {
+    name: 'Road Freight / LTL',
+    icon: <Truck size={24} />,
+    description: 'Common less-than-truckload and road freight charges',
+    items: [
+      { name: 'Base Freight', rate: 0.15, rate_type: 'Per lb' },
+      { name: 'Fuel Surcharge', rate: 18.5, rate_type: 'Percentage of base freight charge' },
+      { name: 'Residential Delivery', rate: 85.00, rate_type: 'Flat fee per occurrence' },
+      { name: 'Liftgate Fee', rate: 75.00, rate_type: 'Flat fee per occurrence' },
+      { name: 'Detention / Driver Standby', rate: 75.00, rate_type: 'Per hour' },
+      { name: 'Inside Delivery', rate: 95.00, rate_type: 'Flat fee per occurrence' },
+      { name: 'Redelivery Attempt', rate: 65.00, rate_type: 'Flat fee per occurrence' },
+    ],
+  },
+  air: {
+    name: 'Air Freight',
+    icon: <Plane size={24} />,
+    description: 'Common air cargo and express freight charges',
+    items: [
+      { name: 'Air Freight Base Rate', rate: 4.20, rate_type: 'Per kg' },
+      { name: 'Fuel Surcharge', rate: 25.0, rate_type: 'Percentage of base freight charge' },
+      { name: 'Airport Handling Fee', rate: 0.15, rate_type: 'Per kg' },
+      { name: 'Security Surcharge', rate: 0.10, rate_type: 'Per kg' },
+      { name: 'AWB (Airway Bill) Fee', rate: 35.00, rate_type: 'Flat fee per occurrence' },
+      { name: 'Dangerous Goods Surcharge', rate: 150.00, rate_type: 'Flat fee per occurrence' },
+    ],
+  },
+  ocean: {
+    name: 'Ocean / Sea Freight',
+    icon: <Ship size={24} />,
+    description: 'Common ocean container and sea freight charges',
+    items: [
+      { name: 'Ocean Freight Base Rate', rate: 850.00, rate_type: 'Flat fee per occurrence' },
+      { name: 'BAF (Bunker Adjustment Factor)', rate: 12.0, rate_type: 'Percentage of base freight charge' },
+      { name: 'CAF (Currency Adjustment Factor)', rate: 3.0, rate_type: 'Percentage of base freight charge' },
+      { name: 'Port Handling (Origin)', rate: 120.00, rate_type: 'Flat fee per occurrence' },
+      { name: 'Port Handling (Destination)', rate: 120.00, rate_type: 'Flat fee per occurrence' },
+      { name: 'Documentation Fee', rate: 65.00, rate_type: 'Flat fee per occurrence' },
+      { name: 'Container Seal Fee', rate: 25.00, rate_type: 'Flat fee per occurrence' },
+    ],
+  },
+  custom: {
+    name: 'Custom / Blank',
+    icon: <FileSignature size={24} />,
+    description: 'Start with no charge items — build from scratch',
+    items: [],
+  },
+};
 
 interface ContractFormProps {
   contract?: Contract | null;
@@ -21,52 +79,38 @@ interface ContractFormProps {
 export default function ContractForm({ contract, onSuccess }: ContractFormProps) {
   const isEditing = !!contract;
 
+  const [showTemplatePicker, setShowTemplatePicker] = useState(!isEditing);
   const [carrierName, setCarrierName] = useState(contract?.carrier_name || '');
-  const [effectiveDate, setEffectiveDate] = useState(contract?.effective_date || '2026-06-01');
-  const [expiryDate, setExpiryDate] = useState(contract?.expiry_date || '2027-06-01');
+  const [effectiveDate, setEffectiveDate] = useState(contract?.effective_date || '');
+  const [expiryDate, setExpiryDate] = useState(contract?.expiry_date || '');
+  const [minimumCharge, setMinimumCharge] = useState((contract?.minimum_charge ?? 0).toString());
+  const [currency, setCurrency] = useState(contract?.currency || 'USD');
 
-  const [baseRateLb, setBaseRateLb] = useState((contract?.base_rate_per_lb ?? 0.12).toString());
-  const [baseRateMile, setBaseRateMile] = useState((contract?.base_rate_per_mile ?? 1.50).toString());
-  const [minimumCharge, setMinimumCharge] = useState((contract?.minimum_charge ?? 120.00).toString());
+  const [chargeItems, setChargeItems] = useState<ChargeItem[]>(
+    (contract?.charge_items || []).map(ci => ({ ...ci }))
+  );
 
-  const [fuelPct, setFuelPct] = useState(((contract?.fuel_surcharge_pct ?? 0.14) * 100).toString());
-  const [residentialSurcharge, setResidentialSurcharge] = useState((contract?.residential_surcharge ?? 75.00).toString());
-  const [liftgateFee, setLiftgateFee] = useState((contract?.liftgate_fee ?? 65.00).toString());
-  const [detentionRate, setDetentionRate] = useState((contract?.detention_rate_per_hr ?? 50.00).toString());
-  const [insideDeliveryFee, setInsideDeliveryFee] = useState((contract?.inside_delivery_fee ?? 90.00).toString());
-  const [redeliveryFee, setRedeliveryFee] = useState((contract?.redelivery_fee ?? 50.00).toString());
-
-  const initialRules: CustomRuleItem[] = (() => {
-    if (contract?.custom_rules) {
-      if (Array.isArray(contract.custom_rules)) {
-        return contract.custom_rules as CustomRuleItem[];
-      } else {
-        return Object.entries(contract.custom_rules).map(([key, value]) => ({
-          name: key.replace(/_/g, ' '),
-          value: String(value),
-          type: 'Fixed Fee' as const
-        }));
-      }
-    }
-    return [
-      { name: 'Free Detention Minutes', value: '45', type: 'Fixed Fee' as const }
-    ];
-  })();
-
-  const [customRules, setCustomRules] = useState<CustomRuleItem[]>(initialRules);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  const handleAddRule = () => {
-    setCustomRules(prev => [...prev, { name: '', value: '', type: 'Fixed Fee' }]);
+  const selectTemplate = (templateKey: string) => {
+    const template = TEMPLATES[templateKey];
+    if (template) {
+      setChargeItems(template.items.map(i => ({ ...i })));
+    }
+    setShowTemplatePicker(false);
   };
 
-  const handleRemoveRule = (index: number) => {
-    setCustomRules(prev => prev.filter((_, i) => i !== index));
+  const addChargeItem = () => {
+    setChargeItems(prev => [...prev, { name: '', rate: 0, rate_type: 'Flat fee per occurrence' }]);
   };
 
-  const handleUpdateRule = (index: number, fields: Partial<CustomRuleItem>) => {
-    setCustomRules(prev => prev.map((item, i) => i === index ? { ...item, ...fields } : item));
+  const removeChargeItem = (index: number) => {
+    setChargeItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateChargeItem = (index: number, fields: Partial<ChargeItem>) => {
+    setChargeItems(prev => prev.map((item, i) => i === index ? { ...item, ...fields } : item));
   };
 
   const handleBackToContracts = (e: React.MouseEvent) => {
@@ -78,7 +122,7 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!carrierName.trim()) {
-      setErrorText("Carrier Name is required.");
+      setErrorText('Carrier name is required.');
       return;
     }
 
@@ -89,16 +133,9 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
       carrier_name: carrierName,
       effective_date: effectiveDate,
       expiry_date: expiryDate,
-      base_rate_per_lb: parseFloat(baseRateLb) || 0,
-      base_rate_per_mile: parseFloat(baseRateMile) || 0,
       minimum_charge: parseFloat(minimumCharge) || 0,
-      fuel_surcharge_pct: (parseFloat(fuelPct) || 0) / 100,
-      residential_surcharge: parseFloat(residentialSurcharge) || 0,
-      liftgate_fee: parseFloat(liftgateFee) || 0,
-      detention_rate_per_hr: parseFloat(detentionRate) || 0,
-      inside_delivery_fee: parseFloat(insideDeliveryFee) || 0,
-      redelivery_fee: parseFloat(redeliveryFee) || 0,
-      custom_rules: customRules.filter(rule => rule.name.trim() !== ''),
+      currency,
+      charge_items: chargeItems.filter(ci => ci.name.trim() !== ''),
     };
 
     try {
@@ -112,21 +149,20 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
       });
 
       if (!response.ok) {
-        throw new Error(await response.text() || "Failed to save contract");
+        throw new Error(await response.text() || 'Failed to save contract');
       }
 
       const result = await response.json();
-      
-      const customEventName = isEditing ? 'contracts-updated' : 'contracts-created';
-      window.dispatchEvent(new CustomEvent(customEventName, { detail: result.data || { ...payload, id: contract?.id || `contract-${Date.now()}` } }));
 
-      const successToast = new CustomEvent('show-toast', {
+      const customEventName = isEditing ? 'contracts-updated' : 'contracts-created';
+      window.dispatchEvent(new CustomEvent(customEventName, { detail: result.data || payload }));
+
+      window.dispatchEvent(new CustomEvent('show-toast', {
         detail: {
-          title: "Contract Saved",
-          message: `Policies for '${carrierName}' archived.`
-        }
-      });
-      window.dispatchEvent(successToast);
+          title: 'Contract Saved',
+          message: `Agreement for '${carrierName}' archived.`,
+        },
+      }));
 
       if (onSuccess) {
         onSuccess();
@@ -135,12 +171,12 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
         window.dispatchEvent(new Event('popstate'));
       }
     } catch (err: any) {
-      console.error("Failed to save contract:", err);
+      console.error('Failed to save contract:', err);
       window.dispatchEvent(new CustomEvent('show-toast', {
         detail: {
-          title: "Save Failed",
-          message: err.message || "Could not save contract."
-        }
+          title: 'Save Failed',
+          message: err.message || 'Could not save contract.',
+        },
       }));
 
       if (onSuccess) {
@@ -154,14 +190,39 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
     }
   };
 
+  if (showTemplatePicker) {
+    return (
+      <div className="max-w-2xl mx-auto animate-fade-in">
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">New Carrier Agreement</h2>
+          <p className="text-sm text-gray-500 mb-6">Start from a template or build from scratch?</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {Object.entries(TEMPLATES).map(([key, tpl]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => selectTemplate(key)}
+                className="text-left p-5 bg-white border-2 border-gray-100 hover:border-indigo-300 hover:bg-indigo-50/30 rounded-xl transition-all cursor-pointer group"
+              >
+                <div className="text-gray-400 group-hover:text-indigo-600 mb-3">
+                  {tpl.icon}
+                </div>
+                <h3 className="text-sm font-semibold text-gray-900 group-hover:text-indigo-700">{tpl.name}</h3>
+                <p className="text-xs text-gray-400 mt-1 leading-relaxed">{tpl.description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const inputClass = "w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all";
   const labelClass = "block text-sm font-medium text-gray-700 mb-1.5";
-  const sectionHeaderClass = "flex items-center gap-2 pb-3 border-b border-gray-50 mb-4";
-  const accentBarClass = "w-1 h-4 bg-indigo-500 rounded-full";
 
   return (
-    <div className="max-w-2xl mx-auto bg-white border border-gray-100 rounded-2xl shadow-sm p-8 space-y-6 animate-fade-in" id="contract-builder-form">
-      
+    <div className="max-w-3xl mx-auto bg-white border border-gray-100 rounded-2xl shadow-sm p-8 space-y-6 animate-fade-in">
       <div className="flex items-center gap-3 pb-4 border-b border-gray-50">
         <button
           onClick={handleBackToContracts}
@@ -175,27 +236,25 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
             {isEditing ? 'Edit Carrier Agreement' : 'New Carrier Agreement'}
           </h2>
           <p className="text-sm text-gray-500">
-            Define negotiated rates and surcharge terms.
+            Define negotiated rates and charge items.
           </p>
         </div>
       </div>
 
       {errorText && (
-        <div className="bg-red-50 border border-red-100 text-red-600 rounded-xl p-4 text-sm flex items-center gap-3">
-          <ShieldAlert size={16} />
-          <span>{errorText}</span>
+        <div className="bg-red-50 border border-red-100 text-red-600 rounded-xl p-4 text-sm">
+          {errorText}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
-        
         <section>
-          <div className={sectionHeaderClass}>
-            <div className={accentBarClass} />
+          <div className="flex items-center gap-2 pb-3 border-b border-gray-50 mb-4">
+            <div className="w-1 h-4 bg-indigo-500 rounded-full" />
             <h3 className="text-sm font-semibold text-gray-900">Carrier Info</h3>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-1">
               <label className={labelClass}>Carrier Name</label>
               <input
@@ -207,229 +266,120 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
                 className={inputClass}
               />
             </div>
-
             <div>
               <label className={labelClass}>Effective Date</label>
-              <input
-                type="date"
-                required
-                value={effectiveDate}
-                onChange={(e) => setEffectiveDate(e.target.value)}
-                className={inputClass}
-              />
+              <input type="date" required value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} className={inputClass} />
             </div>
-
             <div>
               <label className={labelClass}>Expiry Date</label>
-              <input
-                type="date"
-                required
-                value={expiryDate}
-                onChange={(e) => setExpiryDate(e.target.value)}
-                className={inputClass}
-              />
+              <input type="date" required value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} className={inputClass} />
             </div>
+            <div>
+              <label className={labelClass}>Currency</label>
+              <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="CAD">CAD (C$)</option>
+                <option value="AUD">AUD (A$)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4 max-w-[200px]">
+            <label className={labelClass}>Minimum Charge</label>
+            <input
+              type="number"
+              step="0.01"
+              value={minimumCharge}
+              onChange={(e) => setMinimumCharge(e.target.value)}
+              placeholder="0.00"
+              className={inputClass}
+            />
           </div>
         </section>
 
         <section>
-          <div className={sectionHeaderClass}>
-            <div className={accentBarClass} />
-            <h3 className="text-sm font-semibold text-gray-900">Base Rates</h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className={labelClass}>Base Rate per LB ($)</label>
-              <input
-                type="number"
-                step="0.0001"
-                required
-                value={baseRateLb}
-                onChange={(e) => setBaseRateLb(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>Base Rate per Mile ($)</label>
-              <input
-                type="number"
-                step="0.0001"
-                required
-                value={baseRateMile}
-                onChange={(e) => setBaseRateMile(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>Minimum Charge ($)</label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={minimumCharge}
-                onChange={(e) => setMinimumCharge(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <div className={sectionHeaderClass}>
-            <div className={accentBarClass} />
-            <h3 className="text-sm font-semibold text-gray-900">Accessorial Charges</h3>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            <div>
-              <label className={labelClass}>Fuel Surcharge (%)</label>
-              <input
-                type="number"
-                step="0.1"
-                required
-                value={fuelPct}
-                onChange={(e) => setFuelPct(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>Residential ($)</label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={residentialSurcharge}
-                onChange={(e) => setResidentialSurcharge(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>Liftgate Fee ($)</label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={liftgateFee}
-                onChange={(e) => setLiftgateFee(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>Detention per Hour ($)</label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={detentionRate}
-                onChange={(e) => setDetentionRate(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>Inside Delivery ($)</label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={insideDeliveryFee}
-                onChange={(e) => setInsideDeliveryFee(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>Redelivery Fee ($)</label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={redeliveryFee}
-                onChange={(e) => setRedeliveryFee(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <div className="flex justify-between items-center pb-3 border-b border-gray-50 mb-4">
+          <div className="flex items-center justify-between pb-3 border-b border-gray-50 mb-4">
             <div className="flex items-center gap-2">
-              <div className={accentBarClass} />
-              <h3 className="text-sm font-semibold text-gray-900">Custom Audit Policies</h3>
+              <div className="w-1 h-4 bg-indigo-500 rounded-full" />
+              <h3 className="text-sm font-semibold text-gray-900">Charge Items</h3>
             </div>
-            
             <button
               type="button"
-              onClick={handleAddRule}
-              className="border-2 border-dashed border-gray-200 hover:border-indigo-200 text-gray-500 hover:text-indigo-600 text-sm font-medium rounded-xl px-4 py-1.5 transition-colors duration-150 flex items-center gap-1 cursor-pointer"
+              onClick={addChargeItem}
+              className="border-2 border-dashed border-gray-200 hover:border-indigo-200 text-gray-500 hover:text-indigo-600 text-sm font-medium rounded-xl px-4 py-1.5 transition-colors flex items-center gap-1 cursor-pointer"
             >
               <Plus size={12} />
-              <span>Add Rule</span>
+              <span>Add charge item</span>
             </button>
           </div>
 
-          <div className="space-y-3">
-            {customRules.length === 0 ? (
-              <div className="py-6 border border-dashed border-gray-200 rounded-xl text-center text-sm text-gray-400">
-                No custom rules defined.
-              </div>
-            ) : (
-              customRules.map((rule, index) => (
-                <div key={index} className="flex gap-3 items-center flex-wrap md:flex-nowrap bg-gray-50 rounded-xl p-3 border border-gray-100">
-                  <div className="flex-1 min-w-[150px]">
-                    <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">Rule Name</span>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Free Waiting Minutes"
-                      value={rule.name}
-                      onChange={(e) => handleUpdateRule(index, { name: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all"
-                    />
-                  </div>
-
-                  <div className="w-[120px] shrink-0">
-                    <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">Value</span>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. 60"
-                      value={rule.value}
-                      onChange={(e) => handleUpdateRule(index, { value: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all"
-                    />
-                  </div>
-
-                  <div className="w-[150px] shrink-0">
-                    <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">Type</span>
-                    <select
-                      value={rule.type}
-                      onChange={(e) => handleUpdateRule(index, { type: e.target.value as any })}
-                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all"
-                    >
-                      <option value="Fixed Fee">Fixed Fee</option>
-                      <option value="Percentage">Percentage</option>
-                      <option value="Not Allowed">Not Allowed</option>
-                    </select>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveRule(index)}
-                    className="p-1 text-gray-400 hover:text-red-500 shrink-0 self-end md:mt-0 mt-2 mb-0.5 cursor-pointer"
-                  >
-                    <X size={15} />
-                  </button>
-                </div>
-              ))
-            )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                  <th className="text-left pb-2 pr-2 min-w-[200px]">Charge Name</th>
+                  <th className="text-left pb-2 pr-2 min-w-[100px]">Rate</th>
+                  <th className="text-left pb-2 pr-2 min-w-[200px]">Rate Type</th>
+                  <th className="pb-2 w-10" />
+                </tr>
+              </thead>
+              <tbody>
+                {chargeItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="text-center py-8 text-gray-400 text-sm">
+                      No charge items defined. Click "Add charge item" to start.
+                    </td>
+                  </tr>
+                ) : (
+                  chargeItems.map((item, index) => (
+                    <tr key={index} className="border-t border-gray-50">
+                      <td className="py-2 pr-2">
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Driver Standby Time"
+                          value={item.name}
+                          onChange={(e) => updateChargeItem(index, { name: e.target.value })}
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all"
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="Rate"
+                          value={item.rate || ''}
+                          onChange={(e) => updateChargeItem(index, { rate: parseFloat(e.target.value) || 0 })}
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all"
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <select
+                          value={item.rate_type}
+                          onChange={(e) => updateChargeItem(index, { rate_type: e.target.value as RateType })}
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all"
+                        >
+                          {RATE_TYPES.map((rt) => (
+                            <option key={rt} value={rt}>{rt}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeChargeItem(index)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <X size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </section>
 
@@ -441,11 +391,10 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
           >
             Cancel
           </button>
-          
           <button
             type="submit"
             disabled={isSubmitting}
-            className="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold text-sm px-4 py-2 rounded-xl transition-colors duration-150 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            className="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold text-sm px-4 py-2 rounded-xl transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {isSubmitting ? (
               <>
@@ -460,7 +409,6 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
             )}
           </button>
         </div>
-
       </form>
     </div>
   );

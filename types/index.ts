@@ -3,29 +3,40 @@ export type LineItemStatus = 'pending' | 'approved' | 'disputed';
 export type DisputeStatus = 'draft' | 'sent' | 'resolved' | 'rejected';
 export type AuditFlag = 'correct' | 'overcharged' | 'undercharged' | 'not_in_contract' | 'suspicious';
 
+export type RateType = 
+  | 'Per lb'
+  | 'Per kg'
+  | 'Per mile'
+  | 'Per km'
+  | 'Per hour'
+  | 'Per CBM'
+  | 'Flat fee per occurrence'
+  | 'Percentage of base freight charge'
+  | 'Percentage of cargo value'
+  | 'Not Allowed';
+
+export interface ChargeItem {
+  name: string;
+  rate: number;
+  rate_type: RateType;
+}
+
 export interface Organization {
   id: string;
   name: string;
-  owner_id: string; // references auth.users
+  owner_id: string;
   created_at: string;
 }
 
 export interface Contract {
   id: string;
-  org_id: string; // references organizations
+  org_id: string;
   carrier_name: string;
   effective_date: string;
   expiry_date: string;
-  base_rate_per_lb: number;
-  base_rate_per_mile: number;
-  fuel_surcharge_pct: number;
-  residential_surcharge: number;
-  detention_rate_per_hr: number;
-  liftgate_fee: number;
-  inside_delivery_fee: number;
-  redelivery_fee: number;
   minimum_charge: number;
-  custom_rules?: Record<string, any>; // jsonb
+  currency: string;
+  charge_items: ChargeItem[];
   created_at: string;
 }
 
@@ -51,6 +62,7 @@ export interface Invoice {
   total_billed: number;
   total_approved: number;
   total_savings: number;
+  resolved_by?: string;
   uploaded_at: string;
   audited_at?: string;
 }
@@ -67,6 +79,8 @@ export interface LineItem {
   status: LineItemStatus;
   reviewed_by?: string; // references auth.users
   reviewed_at?: string;
+  approval_reason?: string;
+  approval_notes?: string;
   created_at: string;
 }
 
@@ -82,6 +96,9 @@ export interface Dispute {
   sent_at?: string;
   resolved_at?: string;
   resolution_amount?: number;
+  resolution_outcome?: string;
+  resolution_notes?: string;
+  resolved_by?: string;
   created_at: string;
 }
 
