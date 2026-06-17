@@ -30,13 +30,19 @@ export default function DataTable({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 35;
 
+  const getUploadType = (inv: Invoice): 'single' | 'batch' => {
+    if (inv.upload_type === 'batch') return 'batch';
+    if (inv.upload_type === 'single') return 'single';
+    return inv.batch_id ? 'batch' : 'single';
+  };
+
   const filteredAndSortedData = useMemo(() => {
     let list = [...data];
 
     if (batchFilter === 'single') {
-      list = list.filter(inv => !inv.batch_id && (!inv.source || !inv.source.startsWith('Batch —')));
+      list = list.filter(inv => getUploadType(inv) === 'single');
     } else if (batchFilter === 'batch') {
-      list = list.filter(inv => !!inv.batch_id || (inv.source && inv.source.startsWith('Batch —')));
+      list = list.filter(inv => getUploadType(inv) === 'batch');
     }
 
     return list.sort((a, b) => {
@@ -64,7 +70,7 @@ export default function DataTable({
     e.stopPropagation();
     setExpandedBatches(prev => ({
       ...prev,
-      [batchId]: prev[batchId] === false ? true : false
+      [batchId]: prev[batchId] === true ? false : true
     }));
   };
 
@@ -83,28 +89,32 @@ export default function DataTable({
       invoice?: Invoice;
       batchId?: string;
       batchFilename?: string;
+      batchDate?: string;
       childInvoices?: Invoice[];
     }> = [];
 
     const processedBatchIds = new Set<string>();
 
     filteredAndSortedData.forEach((invoice) => {
-      const bId = invoice.batch_id;
+      const uploadType = getUploadType(invoice);
       
-      if (!bId) {
+      if (uploadType !== 'batch' || !invoice.batch_id) {
         items.push({ type: 'single', invoice });
       } else {
+        const bId = invoice.batch_id;
         if (processedBatchIds.has(bId)) return;
         processedBatchIds.add(bId);
 
-        const siblings = filteredAndSortedData.filter(i => i.batch_id === bId);
-        const filename = invoice.source?.replace('Batch — ', '') || 'Bulk Load Dataset';
+        const siblings = filteredAndSortedData.filter(i => i.batch_id === bId && getUploadType(i) === 'batch');
+        const filename = invoice.source?.replace('Batch — ', '') || 'Batch upload';
+        const batchDate = siblings[0]?.uploaded_at;
 
         items.push({
           type: 'batch_header',
           batchId: bId,
           batchFilename: filename,
-          childInvoices: siblings
+          childInvoices: siblings,
+          batchDate
         });
 
         siblings.forEach((sib) => {
@@ -246,10 +256,11 @@ export default function DataTable({
               paginatedItems.map((item, index) => {
                 if (item.type === 'batch_header') {
                   const bId = item.batchId!;
-                  const isCollapsed = expandedBatches[bId] === false;
+                  const isExpanded = expandedBatches[bId] === true;
                   const totalCount = item.childInvoices?.length || 0;
                   const totalBilledVal = item.childInvoices?.reduce((sum, i) => sum + i.total_billed, 0) || 0;
                   const totalSavingsVal = item.childInvoices?.reduce((sum, i) => sum + i.total_savings, 0) || 0;
+                  const batchDate = item.batchDate;
 
                   return (
                     <tr 
@@ -260,12 +271,17 @@ export default function DataTable({
                       <td colSpan={4} className="py-3 px-4 font-semibold">
                         <div className="flex items-center gap-3">
                           <span className="p-0.5 rounded text-indigo-600">
-                            {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                           </span>
                           <Folder size={14} className="text-indigo-500 shrink-0" />
                           <span className="font-semibold text-gray-900 text-sm">
                             {item.batchFilename}
                           </span>
+                          {batchDate && (
+                            <span className="text-gray-400 text-xs font-mono">
+                              {new Date(batchDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          )}
                           <span className="px-2 py-0.5 rounded-full bg-gray-200 text-[10px] text-gray-500 font-mono font-semibold">
                             {totalCount} Invoices
                           </span>
@@ -285,14 +301,14 @@ export default function DataTable({
                       </td>
                       <td className="py-3 px-4 text-right">
                         <span className="text-xs text-gray-400 font-mono">
-                          {isCollapsed ? 'Expand' : 'Collapse'}
+                          {isExpanded ? 'Collapse' : 'Expand'}
                         </span>
                       </td>
                     </tr>
                   );
                 }
 
-                if (item.type === 'batch_child' && item.batchId && expandedBatches[item.batchId] === false) {
+                if (item.type === 'batch_child' && item.batchId && expandedBatches[item.batchId] !== true) {
                   return null;
                 }
 
@@ -331,11 +347,15 @@ export default function DataTable({
                       {invoice.uploaded_at ? new Date(invoice.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
                     </td>
 
-                    <td className="py-3 px-4 text-gray-400 text-xs font-mono max-w-[140px] truncate">
-                      {isChild ? (
-                        <span className="text-indigo-500 font-semibold">Batch Sub-PDF</span>
+                    <td className="py-3 px-4">
+                      {isChild || getUploadType(invoice) === 'batch' ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-semibold font-mono border border-indigo-200">
+                          Batch
+                        </span>
                       ) : (
-                        invoice.source || 'Single Upload'
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-semibold font-mono border border-gray-200">
+                          Single
+                        </span>
                       )}
                     </td>
 

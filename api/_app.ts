@@ -183,6 +183,7 @@ app.post("/api/invoices/upload", uploadRouter.single("file"), async (req, res) =
         .insert({
           org_id,
           contract_id,
+          upload_type: 'single',
           file_name: file.originalname,
           file_url: urlData.publicUrl,
           carrier_name: extractedInvoice.carrier_name,

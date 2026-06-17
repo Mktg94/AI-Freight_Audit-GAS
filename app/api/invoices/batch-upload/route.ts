@@ -217,6 +217,7 @@ export async function POST(request: Request) {
         const invoicePayload = {
           org_id: orgId,
           contract_id: contractId,
+          upload_type: 'batch',
           batch_id: batchId,
           source: `Batch — ${file.name}`,
           file_name: `${file.name} (Split ${split.index})`,

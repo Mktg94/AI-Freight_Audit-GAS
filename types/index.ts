@@ -45,6 +45,7 @@ export interface Invoice {
   org_id: string; // references organizations
   contract_id?: string; // references contracts, nullable if not yet set/matched
   batch_id?: string;
+  upload_type?: string;
   source?: string;
   file_name: string;
   file_url: string;

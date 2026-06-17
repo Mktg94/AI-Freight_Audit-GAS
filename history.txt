@@ -41,3 +41,41 @@
 - Switched from Mailjet to Brevo (Sendinblue) API — uses direct fetch() to https://api.brevo.com/v3/smtp/email, no SDK dependency
 - Updated all email sending in Express (invite, disputes), Next.js (invite, disputes), integrations endpoints, and settings UI to use Brevo
 - Professional HTML email template for dispute letters with red gradient header, dispute summary card, formatted letter body, and branding footer
+
+## 2026-06-17
+- **Improvement 1 — Flexible Contract Builder:**
+  - Added `ChargeItem` type + `RateType` union to `types/index.ts`
+  - Rewrote `ContractForm.tsx` with template selector (Road/Air/Ocean/Custom) and dynamic charge items table
+  - Rewrote `ContractCard.tsx` to display charge_items
+  - Updated AI audit prompt with smart semantic matching for charge items
+  - Updated Express (`api/_app.ts`) and Next.js (`app/api/contracts/`) routes to accept/store `charge_items` + `currency`
+  - Updated rules-based audit fallback to use `charge_items`
+  - SQL migration `schema7.sql` run on Supabase
+
+- **Improvement 2 — PII-safe AI Prompt:**
+  - Created `lib/ai/stripPII.ts` with `stripInvoicePII()` and `stripContractPII()`
+  - Rewrote `lib/ai/auditInvoice.ts` to use `stripPII` internally with data minimization comment
+  - Added "Data & Privacy" tab to settings page with Gemini disclosure notice and what-is/is-not-sent breakdown
+
+- **Improvement 3 — Approve/Dispute Workflow:**
+  - Added `approval_reason`, `approval_notes` to `LineItem` type; `resolution_outcome`, `resolution_notes`, `resolved_by` to `Dispute` type; `resolved_by` to `Invoice` type
+  - Created `components/invoices/ApprovalReasonModal.tsx` (4 radio options + "Other" text box)
+  - Updated `AuditResultPanel.tsx` and `LineItemTable.tsx` — show approval reason modal when discrepancy > 0
+  - Updated `app/api/line-items/[id]/route.ts` and `api/_app.ts` PATCH — accept and store `approval_reason`/`approval_notes`
+  - Updated `api/_app.ts` POST `/api/disputes/:id/resolve` — accepts `resolution_outcome`, `resolution_notes`, `resolved_by`
+  - Updated `app/disputes/[id]/page.tsx` — full resolve form with outcome radios, credit amount, resolution notes
+  - Updated `app/invoices/[id]/page.tsx` — status banner shows contextual state based on line item status, disputes, resolution
+  - Fixed `tsconfig.json` to exclude `app/` directory (Next.js types not available locally)
+
+- **Upload Type fix (Single vs Batch grouping):**
+  - SQL migration: `ALTER TABLE invoices ADD COLUMN upload_type text DEFAULT 'single'`
+  - SQL cleanup: cleared `batch_id` from single-invoice batches (runs on Supabase)
+  - Express `api/_app.ts` — single upload route now sets `upload_type: 'single'`
+  - Next.js `app/api/invoices/upload/route.ts` — single upload route sets `upload_type: 'single'`
+  - Next.js `app/api/invoices/batch-upload/route.ts` — batch upload route sets `upload_type: 'batch'`
+  - `components/invoices/DataTable.tsx` — rewrote grouping to use `upload_type`: single invoices as plain rows, batch invoices grouped under collapsible headers (default collapsed); batch header shows folder icon, filename, date, count, chevron; Source column shows gray "Single" pill or indigo "Batch" pill
+  - `app/invoices/page.tsx` — renamed filter tabs from "All Uploads/Single Files/Batch Packs" to "All/Single/Batch"
+  - Fixed `syncParamsFromURL()` — was setting search to batch UUID, now only sets batchFilter
+
+- **Bug fixes:**
+  - Added content-type check to invoice detail fetch (`app/invoices/[id]/page.tsx`) to surface HTML response errors

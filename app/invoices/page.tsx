@@ -52,7 +52,6 @@ export default function InvoicesPage() {
       const batchParam = searchParams.get('batch');
       if (batchParam) {
         setBatchFilter('batch');
-        setSearch(batchParam);
       }
     }
   };
@@ -184,19 +183,19 @@ export default function InvoicesPage() {
           onClick={() => setBatchFilter('all')}
           className={`pb-3 px-1 transition-all outline-none cursor-pointer ${batchFilter === 'all' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
         >
-          All Uploads
+          All
         </button>
         <button 
           onClick={() => setBatchFilter('single')}
           className={`pb-3 px-1 transition-all outline-none cursor-pointer ${batchFilter === 'single' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
         >
-          Single Files
+          Single
         </button>
         <button 
           onClick={() => setBatchFilter('batch')}
           className={`pb-3 px-1 transition-all outline-none cursor-pointer ${batchFilter === 'batch' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
         >
-          Batch Packs
+          Batch
         </button>
       </div>
 

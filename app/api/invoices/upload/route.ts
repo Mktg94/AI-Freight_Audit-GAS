@@ -102,6 +102,7 @@ export async function POST(request: Request) {
     const invoicePayload = {
       org_id: orgId,
       contract_id: contractId,
+      upload_type: 'single',
       file_name: file.name,
       file_url: fileUrl,
       carrier_name: extracted.carrier_name,

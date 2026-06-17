@@ -35,8 +35,13 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
 
     try {
       const response = await fetch(`/api/invoices/${resolvedId}`);
+      const contentType = response.headers.get('content-type') || '';
       if (!response.ok) {
         throw new Error(await response.text() || 'Failed to fetch invoice details.');
+      }
+      if (!contentType.includes('application/json')) {
+        const text = await response.text();
+        throw new Error(`Expected JSON but got ${contentType}: ${text.slice(0, 200)}`);
       }
       const data = await response.json();
       if (data.success) {
