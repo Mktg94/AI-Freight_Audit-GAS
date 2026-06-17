@@ -77,5 +77,13 @@
   - `app/invoices/page.tsx` — renamed filter tabs from "All Uploads/Single Files/Batch Packs" to "All/Single/Batch"
   - Fixed `syncParamsFromURL()` — was setting search to batch UUID, now only sets batchFilter
 
+- **Gemini retry + batch resilience:**
+  - `lib/ai/geminiClient.ts` — added `callGeminiWithRetry()` with 3 retries + exponential backoff (2s/4s/8s) on 429/503 errors; `generateGeminiContent()` uses it automatically
+  - `lib/ai/extractInvoice.ts` — now uses `callGeminiWithRetry()` for retry on 503
+  - `app/api/invoices/batch-upload/route.ts` — audit call wrapped in try/catch; on failure, marks invoice as flagged with 0 line items (was stuck in "auditing" forever)
+  - `BatchProgressTracker.tsx` — shows amber warning banner after 30s of processing: "AI model is experiencing high demand..."
+
 - **Bug fixes:**
-  - Added content-type check to invoice detail fetch (`app/invoices/[id]/page.tsx`) to surface HTML response errors
+  - Removed generated carrier_email guess (was `billing-claims@...`) from dispute creation — user now enters email manually
+  - `app/invoices/[id]/page.tsx` — rewrote `fetchInvoiceData()` to use Supabase directly instead of Express API route (fixes "Unexpected token '<'" JSON parse error when Express route wasn't reachable)
+  - `lib/email.ts` — added `tls: { rejectUnauthorized: false }` to nodemailer transport to fix Gmail "self-signed certificate in certificate chain" error

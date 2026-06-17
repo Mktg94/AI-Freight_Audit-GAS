@@ -9,6 +9,7 @@ import {
 import { Invoice, LineItem, Contract, Dispute } from '@/types';
 import InvoiceStatusBadge from '@/components/invoices/InvoiceStatusBadge';
 import LineItemTable from '@/components/invoices/LineItemTable';
+import { createClient } from '@/lib/supabase/client';
 
 interface InvoiceDetailPageProps {
   invoiceId?: string;
@@ -34,29 +35,36 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
     setErrorMessage(null);
 
     try {
-      const response = await fetch(`/api/invoices/${resolvedId}`);
-      const contentType = response.headers.get('content-type') || '';
-      if (!response.ok) {
-        throw new Error(await response.text() || 'Failed to fetch invoice details.');
-      }
-      if (!contentType.includes('application/json')) {
-        const text = await response.text();
-        throw new Error(`Expected JSON but got ${contentType}: ${text.slice(0, 200)}`);
-      }
-      const data = await response.json();
-      if (data.success) {
-        setInvoice(data.invoice);
-        setLineItems(data.lineItems || []);
-        setContract(data.contract);
-      } else {
-        throw new Error(data.error || 'Server structure resolved with errors.');
+      const supabase = createClient();
+
+      const { data: invoice, error: invError } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('id', resolvedId)
+        .single();
+      if (invError || !invoice) throw new Error(invError?.message || 'Invoice not found');
+      setInvoice(invoice);
+
+      const { data: lineItems } = await supabase
+        .from('line_items')
+        .select('*')
+        .eq('invoice_id', resolvedId);
+      setLineItems(lineItems || []);
+
+      if (invoice.contract_id) {
+        const { data: contract } = await supabase
+          .from('contracts')
+          .select('*')
+          .eq('id', invoice.contract_id)
+          .single();
+        setContract(contract);
       }
 
-      const dispRes = await fetch(`/api/disputes?invoice_id=${resolvedId}`);
-      if (dispRes.ok) {
-        const dispData = await dispRes.json();
-        if (dispData.success) setDisputes(dispData.data || []);
-      }
+      const { data: disputesData } = await supabase
+        .from('disputes')
+        .select('*')
+        .eq('invoice_id', resolvedId);
+      setDisputes(disputesData || []);
     } catch (err: any) {
       console.error(err);
       setErrorMessage(err.message || 'Network error fetching invoice ledger details.');
@@ -120,7 +128,7 @@ export default function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPa
         },
         body: JSON.stringify({
           invoice_id: resolvedId,
-          carrier_email: 'billing-claims@' + (invoice.carrier_name.toLowerCase().includes('ups') ? 'ups-freight.com' : invoice.carrier_name.toLowerCase().includes('fedex') ? 'fedex-claims.com' : 'dhl-express.com')
+          carrier_email: ''
         })
       });
 

@@ -258,27 +258,49 @@ export async function POST(request: Request) {
         }
 
         // Run Audit
-        const auditResult = await auditInvoice(extracted, JSON.stringify(selectedContract));
+        let auditResult: any;
+        try {
+          auditResult = await auditInvoice(extracted, JSON.stringify(selectedContract));
+        } catch (auditErr: any) {
+          console.warn(`[batch-upload] Audit failed for ${file.name}, skipping:`, auditErr.message);
+          auditResult = null;
+        }
 
         let totalApproved = 0;
-        const lineItemInserts = auditResult.line_items.map((auditLine, idx) => {
-          totalApproved += auditLine.expected;
-          return {
-            id: `li-live-${Date.now()}-${idx}`,
+        let lineItemInserts: any[] = [];
+        if (auditResult?.line_items) {
+          lineItemInserts = auditResult.line_items.map((auditLine: any, idx: number) => {
+            totalApproved += auditLine.expected;
+            return {
+              id: `li-live-${Date.now()}-${idx}`,
+              invoice_id: insertedInvoice.id,
+              description: auditLine.description,
+              billed_amount: auditLine.billed,
+              expected_amount: auditLine.expected,
+              discrepancy: auditLine.difference,
+              ai_flag_reason: auditLine.difference > 0 ? auditLine.reason : undefined,
+              confidence_score: auditLine.status === 'match' ? 0.95 : 0.85,
+              status: (auditLine.difference > 0 ? 'disputed' : 'approved') as const,
+              created_at: new Date().toISOString()
+            };
+          });
+        } else if (!auditResult) {
+          lineItemInserts = [{
+            id: `li-live-${Date.now()}-0`,
             invoice_id: insertedInvoice.id,
-            description: auditLine.description,
-            billed_amount: auditLine.billed,
-            expected_amount: auditLine.expected,
-            discrepancy: auditLine.difference,
-            ai_flag_reason: auditLine.difference > 0 ? auditLine.reason : undefined,
-            confidence_score: auditLine.status === 'match' ? 0.95 : 0.85,
-            status: (auditLine.difference > 0 ? 'disputed' : 'approved') as const,
+            description: 'Audit pending — AI model was unavailable',
+            billed_amount: insertedInvoice.total_billed,
+            expected_amount: insertedInvoice.total_billed,
+            discrepancy: 0,
+            ai_flag_reason: 'AI audit could not be completed due to high demand. The invoice will be re-audited automatically.',
+            confidence_score: 0,
+            status: 'pending' as const,
             created_at: new Date().toISOString()
-          };
-        });
+          }];
+        }
 
-        const totalSavings = Math.max(0, insertedInvoice.total_billed - totalApproved);
-        const finalStatus = totalSavings > 0 ? 'flagged' : 'approved';
+        const totalSavings = auditResult ? Math.max(0, insertedInvoice.total_billed - totalApproved) : 0;
+        const finalStatus = auditResult ? (totalSavings > 0 ? 'flagged' : 'approved') : 'pending';
 
         // Update database rows with finalized status and lines
         try {

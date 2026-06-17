@@ -1061,7 +1061,9 @@ app.post("/api/disputes/create", async (req, res) => {
       .eq("status", "disputed");
 
     const items = lineItems || [];
-    const totalDisputed = items.reduce((sum: number, li: any) => sum + (Number(li.discrepancy) || 0), 0);
+    const totalDisputed = items.length > 0
+      ? items.reduce((sum: number, li: any) => sum + (Number(li.discrepancy) || 0), 0)
+      : (invoice.total_savings || 0);
 
     const { data: orgData } = await supabase
       .from("organizations")
@@ -1167,7 +1169,7 @@ app.post("/api/disputes/:id/send", async (req, res) => {
   }
 });
 
-app.post("/api/disputes/:id/resolve", async (req, res) => {
+app.post("/api/disputes/:id/resolve", express.json(), async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
     const { id } = req.params;

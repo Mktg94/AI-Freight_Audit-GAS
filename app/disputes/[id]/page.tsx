@@ -166,7 +166,10 @@ export default function DisputeDetailPage({ disputeId: propDisputeId, onBack }: 
           resolution_notes: resolutionNotes,
         }),
       });
-      if (!res.ok) throw new Error("Resolve failed");
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(errBody || "Resolve failed");
+      }
       await loadDisputeData();
       window.dispatchEvent(new CustomEvent('invoices-updated'));
       triggerToast("Dispute Resolved", `Credit of $${resolutionAmount.toFixed(2)} recorded successfully.`);

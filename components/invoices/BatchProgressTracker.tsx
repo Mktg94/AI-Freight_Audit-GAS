@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { 
-  Loader2, CheckCircle2, AlertCircle, ChevronRight, 
+  Loader2, CheckCircle2, AlertCircle, AlertTriangle, ChevronRight, 
   Clock, ArrowRight, Play, RefreshCw, Layers 
 } from 'lucide-react';
 
@@ -122,6 +122,17 @@ export default function BatchProgressTracker({
   return (
     <div className="bg-[#111827] border border-teal-900/40 rounded-xl p-5 md:p-8 space-y-6" id="batch-progress-tracker-card">
       
+      {/* Slow processing notice */}
+      {status !== 'completed' && status !== 'failed' && elapsed > 30 && (
+        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
+          <AlertTriangle size={14} />
+          <span className="font-medium">
+          We're processing your audit.
+          Results may take a few minutes longer than usual.You'll be notified automatically when it's ready.
+          </span>
+        </div>
+      )}
+
       {/* Tracker Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1F2D45]/40 pb-5">
         <div className="space-y-1">
@@ -137,6 +148,7 @@ export default function BatchProgressTracker({
             <span>ID: <code className="text-teal-400">{batchId}</code></span>
             <span>·</span>
             <span>Elapsed: {formatElapsed(elapsed)}</span>
+            {elapsed > 30 && <span className="text-amber-400 animate-pulse">· slow</span>}
           </p>
         </div>
 
