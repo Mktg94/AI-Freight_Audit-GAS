@@ -268,26 +268,31 @@ export default function DataTable({
                       onClick={(e) => toggleBatch(bId, e)}
                       className="bg-gray-50 hover:bg-gray-100 text-gray-900 text-sm cursor-pointer transition-colors border-b border-gray-100 select-none"
                     >
-                      <td colSpan={4} className="py-3 px-4 font-semibold">
-                        <div className="flex items-center gap-3">
-                          <span className="p-0.5 rounded text-indigo-600">
+                      <td className="py-3 px-4 font-semibold">
+                        <div className="flex items-center gap-2">
+                          <span className="p-0.5 rounded text-indigo-600 shrink-0">
                             {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                           </span>
                           <Folder size={14} className="text-indigo-500 shrink-0" />
-                          <span className="font-semibold text-gray-900 text-sm">
+                          <span className="font-semibold text-gray-900 text-sm truncate max-w-[120px]">
                             {item.batchFilename}
                           </span>
-                          {batchDate && (
-                            <span className="text-gray-400 text-xs font-mono">
-                              {new Date(batchDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </span>
-                          )}
-                          <span className="px-2 py-0.5 rounded-full bg-gray-200 text-[10px] text-gray-500 font-mono font-semibold">
-                            {totalCount} Invoices
+                          <span className="px-1.5 py-0.5 rounded-full bg-gray-200 text-[10px] text-gray-500 font-mono font-semibold shrink-0">
+                            {totalCount}
                           </span>
                         </div>
                       </td>
-
+                      <td className="py-3 px-4 text-gray-400 text-xs font-mono">
+                        {totalCount > 1 ? `${totalCount} carriers` : item.childInvoices?.[0]?.carrier_name || ''}
+                      </td>
+                      <td className="py-3 px-4 text-gray-400 font-mono text-xs">
+                        {batchDate ? new Date(batchDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-semibold font-mono border border-indigo-200">
+                          Batch
+                        </span>
+                      </td>
                       <td className="py-3 px-4 text-right font-mono font-semibold text-gray-900">
                         {totalBilledVal.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                       </td>
@@ -295,8 +300,8 @@ export default function DataTable({
                         {totalSavingsVal > 0 ? totalSavingsVal.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '-'}
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-semibold font-mono border border-indigo-200">
-                          Batch
+                        <span className="text-[10px] font-semibold font-mono text-indigo-600">
+                          {totalCount} invoices
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right">

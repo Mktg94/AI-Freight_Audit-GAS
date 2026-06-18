@@ -462,7 +462,7 @@ export default function App() {
     const editId = currentPath.split('/').pop() || '';
     const editingContract = contracts.find(c => c.id === editId) || null;
     pageContent = (
-      <ContractForm contract={editingContract} />
+      <ContractForm contract={editingContract} contractId={editId} />
     );
   } else if (normalizedPath === '/disputes' || normalizedPath.startsWith('/disputes/')) {
     if (normalizedPath === '/disputes') {

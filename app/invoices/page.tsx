@@ -15,11 +15,21 @@ export default function InvoicesPage() {
   const [status, setStatus] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [batchFilter, setBatchFilter] = useState<'all' | 'single' | 'batch'>('all');
 
+  const getUserId = async () => {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      return user?.id || '';
+    } catch { return ''; }
+  };
+
   const fetchInvoices = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const supabase = createClient();
       const { data, error } = await supabase
@@ -29,13 +39,33 @@ export default function InvoicesPage() {
 
       if (error) {
         console.error("Invoices query error:", error);
+        throw error;
       }
-      if (data) {
+      if (data && data.length > 0) {
         console.log(`InvoicesPage: loaded ${data.length} invoices`);
         setInvoices(data);
+        return;
       }
-    } catch (err) {
+      console.log("InvoicesPage: Supabase returned 0 invoices, trying API fallback...");
+      const uid = await getUserId();
+      const apiRes = await fetch(`/api/invoices?user_id=${uid}`);
+      const apiData = await apiRes.json();
+      if (apiData.success && apiData.data && apiData.data.length > 0) {
+        console.log(`InvoicesPage: API fallback loaded ${apiData.data.length} invoices`);
+        setInvoices(apiData.data);
+      }
+    } catch (err: any) {
       console.error("Supabase connection failed:", err);
+      setFetchError(err.message || 'Failed to load invoices');
+      try {
+        const uid = await getUserId();
+        const apiRes = await fetch(`/api/invoices?user_id=${uid}`);
+        const apiData = await apiRes.json();
+        if (apiData.success && apiData.data) {
+          setInvoices(apiData.data);
+          setFetchError(null);
+        }
+      } catch {}
     } finally {
       setLoading(false);
     }
@@ -147,6 +177,12 @@ export default function InvoicesPage() {
     <div className="space-y-6 animate-fade-in" id="invoices-page-root">
       
       <UsageLimitBanner />
+
+      {fetchError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+          Error loading invoices: {fetchError}
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="space-y-1">

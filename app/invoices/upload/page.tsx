@@ -244,13 +244,13 @@ export default function InvoiceUploadPage() {
             files={selectedFiles} 
             onRetry={handleReturnToSetup} 
             onComplete={(ids) => {
-              const toastEvent = new CustomEvent('toast-message', {
+              window.dispatchEvent(new CustomEvent('invoices-updated'));
+              window.dispatchEvent(new CustomEvent('toast-message', {
                 detail: {
                   title: 'Batch Completed',
                   message: 'Freight invoices analyzed, discrepancies categorized successfully.'
                 }
-              });
-              window.dispatchEvent(toastEvent);
+              }));
             }}
           />
         )

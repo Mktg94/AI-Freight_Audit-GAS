@@ -86,4 +86,28 @@
 - **Bug fixes:**
   - Removed generated carrier_email guess (was `billing-claims@...`) from dispute creation — user now enters email manually
   - `app/invoices/[id]/page.tsx` — rewrote `fetchInvoiceData()` to use Supabase directly instead of Express API route (fixes "Unexpected token '<'" JSON parse error when Express route wasn't reachable)
-  - `lib/email.ts` — added `tls: { rejectUnauthorized: false }` to nodemailer transport to fix Gmail "self-signed certificate in certificate chain" error
+   - `lib/email.ts` — added `tls: { rejectUnauthorized: false }` to nodemailer transport to fix Gmail "self-signed certificate in certificate chain" error
+
+## 2026-06-18
+- **Fix: Invoices not appearing after upload:**
+  - Express batch upload (`api/_app.ts`): added `upload_type: 'batch'` to insert payload (was missing, causing batch invoices to default to 'single')
+  - Upload page (`app/invoices/upload/page.tsx`): dispatches `invoices-updated` event on batch completion so invoices page auto-refreshes
+  - Added `GET /api/invoices?user_id=` Express endpoint (bypasses RLS via service role key) as fallback
+  - Invoices page (`app/invoices/page.tsx`): falls back to Express API if direct Supabase query returns 0 invoices or errors; shows error banner on query failure
+  - DataTable (`components/invoices/DataTable.tsx`): `getUploadType` now checks `batch_id` first — any invoice with a `batch_id` is classified as 'batch' regardless of `upload_type` value
+
+- **Fix: AI audit producing $0 line items (PII stripping regression):**
+  - `lib/ai/stripPII.ts`: `stripContractPII()` now converts old-format rate columns into `charge_items` format as fallback when the contract's `charge_items` array is empty. Without this, the AI had no rates to compare against and produced zero expected amounts. Old columns converted: `base_rate_per_lb` → Per lb, `base_rate_per_mile` → Per mile, `fuel_surcharge_pct` → Percentage, plus flat fee columns.
+  - Added diagnostic logging to batch upload route to trace extraction output (line items count, total billed, etc.)
+  - Batch upload now checks `extracted_data?.line_items` as fallback for line items
+
+- **Fix: "Edit Agreement" opening new contract form instead of editing:**
+  - `src/App.tsx`: now passes `contractId` prop to `ContractForm` when editing
+  - `components/contracts/ContractForm.tsx`: accepts `contractId` prop; fetches contract from API when `contract` prop is null (fixes case where App.tsx state doesn't have the contract in memory)
+
+- **Fix: Single-file uploads appearing in Batch tab:**
+  - `api/_app.ts`: batch upload now sets `upload_type: 'single'` for single-file uploads, `'batch'` for multi-file uploads
+  - `DataTable.tsx`: `getUploadType` restored to check `upload_type` first, falls back to `batch_id`
+
+- **Fix: Column alignment in All/Batch tabs:**
+  - `DataTable.tsx`: batch header row now uses 8 individual `<td>` elements instead of `colSpan={4}`, ensuring all rows have identical column structure for proper alignment

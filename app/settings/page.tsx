@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Building2, Sliders, ShieldCheck, Mail, Sparkles, Key, KeyRound, 
-  Terminal, User, CheckCircle2, AlertTriangle, Play, CheckCircle, 
-  Lock, Eye, EyeOff, Laptop, HelpCircle, Palette, Sun, Moon,
+  Building2, ShieldCheck, Key, KeyRound, 
+  Terminal, User, CheckCircle2, AlertTriangle, Play,
+  Lock, Laptop, HelpCircle, Palette, Sun, Moon,
   Users, Loader2, XCircle
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -15,9 +15,8 @@ import InviteMemberForm from '@/components/settings/InviteMemberForm';
 
 export default function SettingsPage() {
   const { role: simulatedRole, setRole: setSimulatedRole } = useRole();
-  const [activeTab, setActiveTab] = useState<'organization' | 'integrations' | 'appearance' | 'account' | 'roles' | 'team' | 'billing' | 'data-privacy'>('organization');
+  const [activeTab, setActiveTab] = useState<'organization' | 'appearance' | 'account' | 'roles' | 'team' | 'billing' | 'data-privacy'>('organization');
   const [loadingOrg, setLoadingOrg] = useState(false);
-  const [loadingIntegrations, setLoadingIntegrations] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const [signingOutDevices, setSigningOutDevices] = useState(false);
 
@@ -51,11 +50,6 @@ export default function SettingsPage() {
 
   const [companyName, setCompanyName] = useState('Atlas Global Logistics');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  const [gmailConfigured, setGmailConfigured] = useState(false);
-  const [anthropicKey, setAnthropicKey] = useState('');
-  const [isAnthropicConnected, setIsAnthropicConnected] = useState(false);
-  const [showAnthropicKey, setShowAnthropicKey] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -158,36 +152,6 @@ export default function SettingsPage() {
     );
   };
 
-  const handleSaveIntegrations = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoadingIntegrations(true);
-    try {
-      const response = await fetch('/api/settings/integrations', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          anthropic_api_key: anthropicKey
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to synchronize cloud endpoints.');
-      }
-
-      const result = await response.json();
-      if (result.success) {
-        setGmailConfigured(result.data.email_connected || result.data.email_configured);
-        setIsAnthropicConnected(result.data.anthropic_connected);
-        setAnthropicKey(result.data.anthropic_api_key || '');
-        triggerToast('Integrations Standardized', 'Connected carrier intelligence nodes updated and saved.');
-      }
-    } catch (err: any) {
-      triggerToast('Hardware Intercept', err.message || 'Failure updating credentials.');
-    } finally {
-      setLoadingIntegrations(false);
-    }
-  };
-
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPassword || !confirmPassword) {
@@ -280,18 +244,6 @@ export default function SettingsPage() {
         >
           <span>Organization</span>
           {activeTab === 'organization' && (
-            <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-indigo-600" />
-          )}
-        </button>
-
-        <button
-          onClick={() => setActiveTab('integrations')}
-          className={`pb-3 px-5 relative transition-all cursor-pointer ${
-            activeTab === 'integrations' ? 'text-indigo-600 font-bold' : 'hover:text-gray-600 text-gray-400'
-          }`}
-        >
-          <span>Integrations</span>
-          {activeTab === 'integrations' && (
             <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-indigo-600" />
           )}
         </button>
@@ -462,148 +414,6 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        )}
-
-        {activeTab === 'integrations' && (
-          <form onSubmit={handleSaveIntegrations} className="space-y-6 animate-fade-in" id="integrations-settings-tabpanel">
-            <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 space-y-6">
-              
-              <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
-                <Sliders className="text-indigo-600" size={20} />
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 tracking-tight">Connected Services</h3>
-                  <p className="text-[10px] text-gray-400 font-mono mt-0.5">AUTHENTICATE SECONDARY API KEY CONNECTIONS</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                <div className="bg-gray-50 border border-gray-100 rounded-xl p-5 space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2.5 bg-green-50 rounded-lg text-green-600">
-                        <Mail size={18} />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-semibold text-gray-900 uppercase">Gmail SMTP</h4>
-                        <p className="text-[9px] text-gray-400 font-mono">Email dispatch via mikeabrsh21@gmail.com</p>
-                      </div>
-                    </div>
-                    {gmailConfigured ? (
-                      <span className="flex items-center gap-1.5 text-[9px] font-semibold font-mono py-1 px-2.5 bg-green-50 text-green-700 rounded-full border border-green-200">
-                        <CheckCircle size={10} /> Connected
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1.5 text-[9px] font-semibold font-mono py-1 px-2.5 bg-gray-100 text-gray-400 rounded-full border border-gray-200">
-                        Not Configured
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="text-xs text-gray-500 leading-relaxed">
-                    Email is sent via Gmail SMTP using <strong className="text-gray-700">mikeabrsh21@gmail.com</strong>
-                    with a generated app password. Set the <code className="text-indigo-600 bg-indigo-50 px-1 rounded text-[10px] font-mono">GMAIL_APP_PASSWORD</code> environment variable on the server.
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 border border-gray-100 rounded-xl p-5 space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2.5 bg-indigo-50 rounded-lg text-indigo-600">
-                        <Sparkles size={18} />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-semibold text-gray-900 uppercase">Anthropic AI</h4>
-                        <p className="text-[9px] text-gray-400 font-mono">Dispute claims generation models</p>
-                      </div>
-                    </div>
-                    {isAnthropicConnected ? (
-                      <span className="flex items-center gap-1.5 text-[9px] font-semibold font-mono py-1 px-2.5 bg-green-50 text-green-700 rounded-full border border-green-200">
-                        <CheckCircle size={10} /> Connected
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1.5 text-[9px] font-semibold font-mono py-1 px-2.5 bg-gray-100 text-gray-400 rounded-full border border-gray-200">
-                        Not Connected
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-mono uppercase text-gray-500 font-semibold block">Anthropic API Key</label>
-                    <div className="relative">
-                      <input
-                        type={showAnthropicKey ? "text" : "password"}
-                        value={anthropicKey}
-                        onChange={(e) => setAnthropicKey(e.target.value)}
-                        placeholder="sk-ant-xxxxxxxxxxxxxxxxxxx"
-                        className="bg-gray-50 border border-gray-200 text-gray-900 focus:border-indigo-400 focus:ring-0 focus:outline-none rounded-lg p-2.5 w-full font-mono text-xs pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowAnthropicKey(!showAnthropicKey)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
-                      >
-                        {showAnthropicKey ? <EyeOff size={14} /> : <Eye size={14} />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              <div className="border-t border-gray-100 pt-4 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={loadingIntegrations}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold font-mono py-2.5 px-5 rounded-lg uppercase tracking-wider text-xs cursor-pointer transition-all disabled:opacity-50"
-                  id="save-integrations-button"
-                >
-                  {loadingIntegrations ? 'Updating API ledger...' : 'Update Integrations'}
-                </button>
-              </div>
-
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="text-[10px] font-mono uppercase tracking-widest text-gray-400 font-semibold pl-1">Coming Soon Integrations:</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" id="coming-soon-integrations-row">
-                
-                <div className="bg-white/50 border border-gray-100 rounded-xl p-4 flex items-center justify-between opacity-60">
-                  <div className="flex items-center gap-2">
-                    <Lock size={13} className="text-gray-300" />
-                    <div>
-                      <h5 className="text-[11px] font-semibold text-gray-500 uppercase">QuickBooks</h5>
-                      <p className="text-[8px] text-gray-400 font-mono">Invoice Ledger Syncer</p>
-                    </div>
-                  </div>
-                  <span className="text-[8px] font-semibold font-mono py-0.5 px-1.5 bg-gray-50 text-gray-300 border border-gray-100 rounded uppercase">Locked</span>
-                </div>
-
-                <div className="bg-white/50 border border-gray-100 rounded-xl p-4 flex items-center justify-between opacity-60">
-                  <div className="flex items-center gap-2">
-                    <Lock size={13} className="text-gray-300" />
-                    <div>
-                      <h5 className="text-[11px] font-semibold text-gray-500 uppercase">Xero Accounting</h5>
-                      <p className="text-[8px] text-gray-400 font-mono">General Ledger API</p>
-                    </div>
-                  </div>
-                  <span className="text-[8px] font-semibold font-mono py-0.5 px-1.5 bg-gray-50 text-gray-300 border border-gray-100 rounded uppercase">Locked</span>
-                </div>
-
-                <div className="bg-white/50 border border-gray-100 rounded-xl p-4 flex items-center justify-between opacity-60">
-                  <div className="flex items-center gap-2">
-                    <Lock size={13} className="text-gray-300" />
-                    <div>
-                      <h5 className="text-[11px] font-semibold text-gray-500 uppercase">SAP Logistics</h5>
-                      <p className="text-[8px] text-gray-400 font-mono">ERP Enterprise Connector</p>
-                    </div>
-                  </div>
-                  <span className="text-[8px] font-semibold font-mono py-0.5 px-1.5 bg-gray-50 text-gray-300 border border-gray-100 rounded uppercase">Locked</span>
-                </div>
-
-              </div>
-            </div>
-          </form>
         )}
 
         {activeTab === 'appearance' && (

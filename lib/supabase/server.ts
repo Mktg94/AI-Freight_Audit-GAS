@@ -9,7 +9,7 @@ export const createClient = () => {
     throw new Error('Supabase URL and anon key must be set');
   }
 
-  if (typeof window === 'undefined' && typeof cookies !== 'undefined') {
+  if (typeof window === 'undefined') {
     try {
       const { cookies } = require('next/headers');
       const cookieStore = cookies();

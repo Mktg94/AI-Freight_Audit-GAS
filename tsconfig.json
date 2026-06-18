@@ -25,6 +25,10 @@
   },
   "exclude": [
     "node_modules",
+    "app",
+    "lib/supabase",
+    "lib/auth",
+    "middleware.ts",
     "src"
   ]
 }

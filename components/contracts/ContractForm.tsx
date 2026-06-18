@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Contract, ChargeItem, RateType } from '@/types';
 import { 
-  Plus, X, ArrowLeft, Save, Truck, Plane, Ship, FileSignature
+  Plus, X, ArrowLeft, Save, Truck, Plane, Ship, FileSignature, Loader2
 } from 'lucide-react';
 
 const RATE_TYPES: RateType[] = [
@@ -73,22 +73,54 @@ const TEMPLATES: Record<string, TemplateDefinition> = {
 
 interface ContractFormProps {
   contract?: Contract | null;
+  contractId?: string;
   onSuccess?: () => void;
 }
 
-export default function ContractForm({ contract, onSuccess }: ContractFormProps) {
-  const isEditing = !!contract;
+export default function ContractForm({ contract, contractId, onSuccess }: ContractFormProps) {
+  const [loadingContract, setLoadingContract] = useState(!!contractId && !contract);
+  const [resolvedContract, setResolvedContract] = useState<Contract | null | undefined>(contract);
+
+  const isEditing = !!(resolvedContract || contractId);
+
+  useEffect(() => {
+    if (contract) {
+      setResolvedContract(contract);
+    } else if (contractId && !resolvedContract) {
+      fetch(`/api/contracts/${contractId}`)
+        .then(r => r.json())
+        .then(data => {
+          const c = data.data || data;
+          if (c && c.id) {
+            setResolvedContract(c);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoadingContract(false));
+    }
+  }, [contract, contractId]);
 
   const [showTemplatePicker, setShowTemplatePicker] = useState(!isEditing);
-  const [carrierName, setCarrierName] = useState(contract?.carrier_name || '');
-  const [effectiveDate, setEffectiveDate] = useState(contract?.effective_date || '');
-  const [expiryDate, setExpiryDate] = useState(contract?.expiry_date || '');
-  const [minimumCharge, setMinimumCharge] = useState((contract?.minimum_charge ?? 0).toString());
-  const [currency, setCurrency] = useState(contract?.currency || 'USD');
+  const [carrierName, setCarrierName] = useState(resolvedContract?.carrier_name || '');
+  const [effectiveDate, setEffectiveDate] = useState(resolvedContract?.effective_date || '');
+  const [expiryDate, setExpiryDate] = useState(resolvedContract?.expiry_date || '');
+  const [minimumCharge, setMinimumCharge] = useState((resolvedContract?.minimum_charge ?? 0).toString());
+  const [currency, setCurrency] = useState(resolvedContract?.currency || 'USD');
 
   const [chargeItems, setChargeItems] = useState<ChargeItem[]>(
-    (contract?.charge_items || []).map(ci => ({ ...ci }))
+    (resolvedContract?.charge_items || []).map(ci => ({ ...ci }))
   );
+
+  useEffect(() => {
+    if (resolvedContract) {
+      setCarrierName(resolvedContract.carrier_name || '');
+      setEffectiveDate(resolvedContract.effective_date || '');
+      setExpiryDate(resolvedContract.expiry_date || '');
+      setMinimumCharge((resolvedContract.minimum_charge ?? 0).toString());
+      setCurrency(resolvedContract.currency || 'USD');
+      setChargeItems((resolvedContract.charge_items || []).map(ci => ({ ...ci })));
+    }
+  }, [resolvedContract]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
@@ -139,7 +171,7 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
     };
 
     try {
-      const endpoint = isEditing ? `/api/contracts/${contract.id}` : '/api/contracts';
+      const endpoint = isEditing ? `/api/contracts/${resolvedContract?.id || contractId}` : '/api/contracts';
       const method = isEditing ? 'PATCH' : 'POST';
 
       const response = await fetch(endpoint, {
@@ -220,6 +252,15 @@ export default function ContractForm({ contract, onSuccess }: ContractFormProps)
 
   const inputClass = "w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-500 transition-all";
   const labelClass = "block text-sm font-medium text-gray-700 mb-1.5";
+
+  if (loadingContract) {
+    return (
+      <div className="max-w-2xl mx-auto py-16 flex flex-col items-center justify-center space-y-4">
+        <Loader2 size={24} className="animate-spin text-indigo-600" />
+        <span className="text-sm text-gray-500 font-mono">Loading contract...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto bg-white border border-gray-100 rounded-2xl shadow-sm p-8 space-y-6 animate-fade-in">

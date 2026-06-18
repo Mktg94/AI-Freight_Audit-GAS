@@ -63,6 +63,21 @@ app.get("/api/contracts", async (req, res) => {
   }
 });
 
+app.get("/api/contracts/:id", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("contracts")
+      .select("*")
+      .eq("id", req.params.id)
+      .single();
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (err: any) {
+    res.status(404).json({ error: "Contract not found", details: err.message });
+  }
+});
+
 app.post("/api/contracts", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
@@ -425,6 +440,7 @@ app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, 
           .insert({
             org_id,
             contract_id,
+            upload_type: files.length > 1 ? 'batch' : 'single',
             file_name: file.originalname,
             file_url: urlData.publicUrl,
             carrier_name: extractedInvoice.carrier_name || "Unknown Carrier",
@@ -459,8 +475,18 @@ app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, 
             .eq("id", contract_id)
             .single();
 
-          if (contractData && extractedInvoice.line_items && extractedInvoice.line_items.length > 0) {
-            const auditResults = await auditLineItems(extractedInvoice.line_items, contractData);
+          const lineItemCount = extractedInvoice.line_items?.length || extractedInvoice.extracted_data?.line_items?.length || 0;
+          console.log(`[batch-upload] Extracted line items for ${file.originalname}:`, JSON.stringify({
+            carrier: extractedInvoice.carrier_name,
+            invoice: extractedInvoice.invoice_number,
+            total_billed: extractedInvoice.total_billed,
+            line_items_count: lineItemCount,
+            has_line_items: !!(extractedInvoice.line_items || extractedInvoice.extracted_data?.line_items)
+          }));
+
+          if (contractData && (extractedInvoice.line_items || extractedInvoice.extracted_data?.line_items) && lineItemCount > 0) {
+            const lineItems = extractedInvoice.line_items || extractedInvoice.extracted_data?.line_items || [];
+            const auditResults = await auditLineItems(lineItems, contractData);
 
             let totalApproved = 0;
             const lineItemInserts = auditResults.map((item, idx) => {
@@ -628,6 +654,45 @@ app.get("/api/invoices/batch/:batchId/status", async (req, res) => {
     });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to get batch status", details: err.message });
+  }
+});
+
+app.get("/api/invoices", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const user_id = req.query.user_id as string;
+    let org_id: string | null = null;
+
+    if (user_id) {
+      const { data: userOrgs } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("owner_id", user_id)
+        .limit(1);
+      if (userOrgs && userOrgs.length > 0) {
+        org_id = userOrgs[0].id;
+      } else {
+        const { data: memberOrgs } = await supabase
+          .from("org_members")
+          .select("org_id")
+          .eq("user_id", user_id)
+          .eq("status", "active")
+          .limit(1);
+        if (memberOrgs && memberOrgs.length > 0) {
+          org_id = memberOrgs[0].org_id;
+        }
+      }
+    }
+
+    let query = supabase.from("invoices").select("*");
+    if (org_id) {
+      query = query.eq("org_id", org_id);
+    }
+    const { data, error } = await query.order("uploaded_at", { ascending: false });
+    if (error) throw error;
+    res.json({ success: true, data: data || [] });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
