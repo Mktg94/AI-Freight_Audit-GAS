@@ -1940,4 +1940,656 @@ app.patch("/api/settings/integrations", (req, res) => {
   });
 });
 
+// ── Admin routes — super admin only ──
+const requireSuperAdmin = async (req: any, res: any, next: any) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+
+    const token = authHeader.replace("Bearer ", "");
+    const supabase = getSupabaseAdmin();
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return res.status(401).json({ error: "Unauthorized" });
+
+    const { data: adminRow } = await supabase
+      .from("super_admins")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!adminRow) return res.status(403).json({ error: "Forbidden" });
+
+    (req as any).adminUser = user;
+    next();
+  } catch {
+    return res.status(500).json({ error: "Server error" });
+  }
+};
+
+// Public admin check — returns { isAdmin: bool } without requiring admin middleware
+app.get("/api/admin/check", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.json({ isAdmin: false });
+
+    const token = authHeader.replace("Bearer ", "");
+    const supabase = getSupabaseAdmin();
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return res.json({ isAdmin: false });
+
+    const { data: adminRow } = await supabase
+      .from("super_admins")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .single();
+
+    return res.json({ isAdmin: !!adminRow });
+  } catch {
+    return res.json({ isAdmin: false });
+  }
+});
+
+app.use("/api/admin", requireSuperAdmin);
+
+app.get("/api/admin/stats", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const [
+      { count: totalOrganizations },
+      { count: totalUsers },
+      { count: totalInvoices },
+      { count: invoicesThisMonth },
+      { data: savingsData },
+      { count: newOrgsThisWeek },
+    ] = await Promise.all([
+      supabase.from("organizations").select("*", { count: "exact", head: true }),
+      supabase.from("org_members").select("*", { count: "exact", head: true }),
+      supabase.from("invoices").select("*", { count: "exact", head: true }),
+      supabase
+        .from("invoices")
+        .select("*", { count: "exact", head: true })
+        .gte("uploaded_at", startOfMonth),
+      supabase
+        .from("invoices")
+        .select("total_savings"),
+      supabase
+        .from("organizations")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", sevenDaysAgo),
+    ]);
+
+    const totalSavings = (savingsData || []).reduce(
+      (sum: number, inv: any) => sum + (parseFloat(inv.total_savings) || 0),
+      0,
+    );
+
+    res.json({
+      total_organizations: totalOrganizations || 0,
+      total_users: totalUsers || 0,
+      total_invoices: totalInvoices || 0,
+      invoices_this_month: invoicesThisMonth || 0,
+      total_savings: totalSavings,
+      new_orgs_this_week: newOrgsThisWeek || 0,
+    });
+  } catch (err) {
+    console.error("Admin /api/admin/stats error:", err);
+    res.status(500).json({ error: "Failed to fetch stats" });
+  }
+});
+
+// ── GET /api/admin/orgs — paginated org list ──
+app.get("/api/admin/orgs", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = (page - 1) * limit;
+    const search = (req.query.search as string) || "";
+    const plan = req.query.plan as string;
+    const status = req.query.status as string;
+    const sort = (req.query.sort as string) || "newest";
+
+    const { data: allOrgs, error: orgsError, count } = await supabase
+      .from("organizations")
+      .select("*", { count: "exact" });
+
+    if (orgsError) throw orgsError;
+
+    // Client-side search on name (owner_id search removed — no FK for join)
+    let filtered = allOrgs || [];
+    if (search) {
+      const s = search.toLowerCase();
+      filtered = filtered.filter((o: any) => o.name?.toLowerCase().includes(s));
+    }
+
+    // Enrich with member counts and invoice stats
+    const orgIds = (filtered || []).map((o: any) => o.id);
+    const memberCounts: Record<string, number> = {};
+    const invoiceCounts: Record<string, { total: number; thisMonth: number; savings: number }> = {};
+    const monthlyStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+
+    if (orgIds.length > 0) {
+      const [{ data: members }, { data: invoices }] = await Promise.all([
+        supabase.from("org_members").select("org_id").in("org_id", orgIds),
+        supabase.from("invoices").select("org_id,total_savings,uploaded_at").in("org_id", orgIds),
+      ]);
+
+      (members || []).forEach((m: any) => {
+        memberCounts[m.org_id] = (memberCounts[m.org_id] || 0) + 1;
+      });
+      (invoices || []).forEach((inv: any) => {
+        if (!invoiceCounts[inv.org_id]) invoiceCounts[inv.org_id] = { total: 0, thisMonth: 0, savings: 0 };
+        invoiceCounts[inv.org_id].total++;
+        if (inv.uploaded_at >= monthlyStart) invoiceCounts[inv.org_id].thisMonth++;
+        invoiceCounts[inv.org_id].savings += parseFloat(inv.total_savings) || 0;
+      });
+    }
+
+    let enriched = filtered.map((o: any) => ({
+      id: o.id,
+      name: o.name,
+      owner_id: o.owner_id,
+      owner_email: "",
+      plan: o.plan || "Free",
+      status: o.status || "active",
+      created_at: o.created_at,
+      members: memberCounts[o.id] || 0,
+      seat_limit: o.seat_limit || 3,
+      invoices_this_month: invoiceCounts[o.id]?.thisMonth || 0,
+      total_invoices: invoiceCounts[o.id]?.total || 0,
+      total_savings: invoiceCounts[o.id]?.savings || 0,
+    }));
+
+    // Sort
+    if (sort === "most_users") enriched.sort((a: any, b: any) => b.members - a.members);
+    else if (sort === "most_invoices") enriched.sort((a: any, b: any) => b.total_invoices - a.total_invoices);
+    else if (sort === "most_savings") enriched.sort((a: any, b: any) => b.total_savings - a.total_savings);
+    else enriched.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    if (plan && plan !== "all") enriched = enriched.filter((o: any) => o.plan.toLowerCase() === plan.toLowerCase());
+    if (status && status !== "all") enriched = enriched.filter((o: any) => o.status.toLowerCase() === status.toLowerCase());
+
+    const total = count || enriched.length;
+    const paged = enriched.slice(offset, offset + limit);
+
+    res.json({ data: paged, total, page, limit });
+  } catch (err) {
+    console.error("Admin /api/admin/orgs error:", err);
+    res.status(500).json({ error: "Failed to fetch orgs" });
+  }
+});
+
+// ── GET /api/admin/orgs/:id — single org detail ──
+app.get("/api/admin/orgs/:id", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { id } = req.params;
+
+    const { data: org, error: orgError } = await supabase
+      .from("organizations")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (orgError || !org) return res.status(404).json({ error: "Organization not found" });
+
+    const [{ data: members }, { data: invoices }, { data: notes }] = await Promise.all([
+      supabase.from("org_members").select("*").eq("org_id", id),
+      supabase.from("invoices").select("*").eq("org_id", id).order("uploaded_at", { ascending: false }).limit(20),
+      supabase.from("admin_notes").select("*").eq("org_id", id).order("created_at", { ascending: false }),
+    ]);
+
+    const monthlyStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+    const invoicesThisMonth = (invoices || []).filter((i: any) => i.uploaded_at >= monthlyStart).length;
+    const totalSavings = (invoices || []).reduce((s: number, i: any) => s + (parseFloat(i.total_savings) || 0), 0);
+    const disputesSent = (invoices || []).filter((i: any) => i.status === "disputed").length;
+
+    res.json({
+      org,
+      members: members || [],
+      recent_invoices: invoices || [],
+      admin_notes: notes || [],
+      usage: {
+        invoices_this_month: invoicesThisMonth,
+        invoice_limit: org.invoice_limit_per_month || 100,
+        disputes_sent: disputesSent,
+        total_savings: totalSavings,
+      },
+    });
+  } catch (err) {
+    console.error("Admin /api/admin/orgs/:id error:", err);
+    res.status(500).json({ error: "Failed to fetch org details" });
+  }
+});
+
+// ── PATCH /api/admin/orgs/:id — modify org ──
+app.patch("/api/admin/orgs/:id", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { id } = req.params;
+    const { action, plan } = req.body;
+
+    if (action === "suspend") {
+      await supabase.from("organizations").update({ status: "suspended" }).eq("id", id);
+    } else if (action === "unsuspend") {
+      await supabase.from("organizations").update({ status: "active" }).eq("id", id);
+    } else if (action === "change_plan" && plan) {
+      const planConfig: Record<string, any> = {
+        starter: { invoice_limit_per_month: 100, seat_limit: 3 },
+        professional: { invoice_limit_per_month: 500, seat_limit: 10 },
+        enterprise: { invoice_limit_per_month: 99999, seat_limit: 999 },
+        free: { invoice_limit_per_month: 10, seat_limit: 1 },
+      };
+      const updates = planConfig[plan.toLowerCase()] || {};
+      await supabase.from("organizations").update({ plan, ...updates }).eq("id", id);
+    } else {
+      return res.status(400).json({ error: "Invalid action" });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Admin PATCH /api/admin/orgs/:id error:", err);
+    res.status(500).json({ error: "Failed to update org" });
+  }
+});
+
+// ── GET /api/admin/users — paginated user list ──
+app.get("/api/admin/users", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = (page - 1) * limit;
+    const search = (req.query.search as string) || "";
+    const role = req.query.role as string;
+    const status = req.query.status as string;
+    const sort = (req.query.sort as string) || "newest";
+
+    // Fetch org_members first, then enrich with org names from separate query
+    let memberQuery = supabase.from("org_members").select("*", { count: "exact" });
+
+    if (role && role !== "all") memberQuery = memberQuery.eq("role", role);
+    if (status && status !== "all") memberQuery = memberQuery.eq("status", status);
+
+    const { data: raw, error, count } = await memberQuery;
+    if (error) throw error;
+
+    // Fetch org names separately
+    const orgIds = [...new Set((raw || []).map((r: any) => r.org_id))];
+    const orgNames: Record<string, string> = {};
+    if (orgIds.length > 0) {
+      const { data: orgs } = await supabase.from("organizations").select("id,name").in("id", orgIds);
+      (orgs || []).forEach((o: any) => { orgNames[o.id] = o.name; });
+    }
+
+    // Client-side search
+    let filtered = raw || [];
+    if (search) {
+      const s = search.toLowerCase();
+      filtered = filtered.filter((r: any) =>
+        (r.email || "").toLowerCase().includes(s) || (r.user_id || "").toLowerCase().includes(s),
+      );
+    }
+
+    let enriched = filtered.map((r: any) => ({
+      id: r.id,
+      user_id: r.user_id,
+      email: r.email || "unknown",
+      name: r.email?.split("@")[0] || "Unknown",
+      org_id: r.org_id,
+      org_name: orgNames[r.org_id] || "Unknown",
+      role: r.role,
+      status: r.status,
+      created_at: r.created_at,
+    }));
+
+    if (sort === "newest") enriched.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    const total = count || enriched.length;
+    const paged = enriched.slice(offset, offset + limit);
+
+    res.json({ data: paged, total, page, limit });
+  } catch (err) {
+    console.error("Admin /api/admin/users error:", err);
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+// ── PATCH /api/admin/users/:id — suspend/unsuspend ──
+app.patch("/api/admin/users/:id", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { id } = req.params;
+    const { action } = req.body;
+
+    if (action === "suspend") {
+      await supabase.from("org_members").update({ status: "suspended" }).eq("user_id", id);
+    } else if (action === "unsuspend") {
+      await supabase.from("org_members").update({ status: "active" }).eq("user_id", id);
+    } else {
+      return res.status(400).json({ error: "Invalid action" });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Admin PATCH /api/admin/users/:id error:", err);
+    res.status(500).json({ error: "Failed to update user" });
+  }
+});
+
+// ── GET /api/admin/revenue — estimated revenue data ──
+app.get("/api/admin/revenue", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+
+    const [orgResult, invoiceResult] = await Promise.all([
+      supabase.from("organizations").select("id,name,plan,created_at,invoice_limit_per_month"),
+      supabase.from("invoices").select("org_id,total_savings,uploaded_at"),
+    ]);
+
+    const orgs = orgResult.data || [];
+    const invoices = invoiceResult.data || [];
+
+    const planPrices: Record<string, number> = {
+      starter: 99,
+      professional: 299,
+      enterprise: 999,
+      free: 0,
+    };
+
+    const planCounts: Record<string, number> = { starter: 0, professional: 0, enterprise: 0, free: 0 };
+    let estimatedMRR = 0;
+    const monthlyStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+
+    // Build per-org invoice stats
+    const orgInvoiceCounts: Record<string, number> = {};
+    const orgMonthCounts: Record<string, number> = {};
+    (invoices).forEach((inv: any) => {
+      orgMonthCounts[inv.org_id] = (orgMonthCounts[inv.org_id] || 0) + 1;
+      if (inv.uploaded_at >= monthlyStart) {
+        orgInvoiceCounts[inv.org_id] = (orgInvoiceCounts[inv.org_id] || 0) + 1;
+      }
+    });
+
+    const orgsBreakdown = (orgs || []).map((o: any) => {
+      const plan = (o.plan || "free").toLowerCase();
+      planCounts[plan] = (planCounts[plan] || 0) + 1;
+      estimatedMRR += planPrices[plan] || 0;
+      return {
+        id: o.id,
+        name: o.name,
+        plan: o.plan || "Free",
+        estimated_monthly_value: planPrices[plan] || 0,
+        invoices_this_month: orgInvoiceCounts[o.id] || 0,
+        invoice_limit: o.invoice_limit_per_month || 100,
+        total_invoices: orgMonthCounts[o.id] || 0,
+      };
+    });
+
+    // Monthly revenue for last 12 months
+    const monthlyRevenue: { month: string; starter: number; professional: number; enterprise: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const monthKey = d.toISOString().slice(0, 7);
+      const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString();
+
+      const activeOrgs = (orgs || []).filter((o: any) => o.created_at <= monthEnd);
+      let starterRev = 0, profRev = 0, entRev = 0;
+      activeOrgs.forEach((o: any) => {
+        const p = (o.plan || "free").toLowerCase();
+        if (p === "starter") starterRev += 99;
+        else if (p === "professional") profRev += 299;
+        else if (p === "enterprise") entRev += 999;
+      });
+
+      monthlyRevenue.push({ month: monthKey, starter: starterRev, professional: profRev, enterprise: entRev });
+    }
+
+    res.json({
+      estimated_mrr: estimatedMRR,
+      estimated_arr: estimatedMRR * 12,
+      paying_orgs: (planCounts.starter || 0) + (planCounts.professional || 0) + (planCounts.enterprise || 0),
+      free_orgs: planCounts.free || 0,
+      plan_distribution: planCounts,
+      monthly_revenue: monthlyRevenue,
+      orgs: orgsBreakdown,
+    });
+  } catch (err) {
+    console.error("Admin /api/admin/revenue error:", err);
+    res.status(500).json({ error: "Failed to fetch revenue data" });
+  }
+});
+
+// ── GET /api/admin/activity — paginated audit log feed ──
+app.get("/api/admin/activity", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = (page - 1) * limit;
+    const dateFrom = req.query.dateFrom as string;
+    const dateTo = req.query.dateTo as string;
+    const action = req.query.action as string;
+    const orgId = req.query.orgId as string;
+    const search = (req.query.search as string) || "";
+
+    let query = supabase
+      .from("audit_logs")
+      .select("*", { count: "exact" });
+
+    if (dateFrom) query = query.gte("created_at", dateFrom);
+    if (dateTo) query = query.lte("created_at", dateTo);
+    if (action && action !== "all") query = query.eq("action", action);
+    if (orgId && orgId !== "all") query = query.eq("org_id", orgId);
+
+    query = query.order("created_at", { ascending: false }).range(offset, offset + limit - 1);
+
+    const { data: rawData, error, count } = await query;
+    if (error) throw error;
+
+    // Enrich with org names and user emails
+    const logOrgIds = [...new Set((rawData || []).map((l: any) => l.org_id))];
+    const logUserIds = [...new Set((rawData || []).map((l: any) => l.user_id).filter(Boolean))];
+    const orgNames: Record<string, string> = {};
+    const userEmails: Record<string, string> = {};
+
+    const [orgResult, userResult] = await Promise.all([
+      logOrgIds.length > 0
+        ? supabase.from("organizations").select("id,name").in("id", logOrgIds)
+        : Promise.resolve({ data: [] }),
+      logUserIds.length > 0
+        ? supabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
+        : Promise.resolve({ data: { users: [] } }),
+    ]);
+
+    (orgResult.data || []).forEach((o: any) => { orgNames[o.id] = o.name; });
+    // @ts-ignore
+    (userResult.data?.users || []).forEach((u: any) => { userEmails[u.id] = u.email || u.id; });
+
+    let enriched = (rawData || []).map((l: any) => ({
+      ...l,
+      org: { name: orgNames[l.org_id] || "Unknown" },
+      user_email: userEmails[l.user_id] || l.user_id || "unknown",
+    }));
+
+    // Client-side search
+    if (search) {
+      const s = search.toLowerCase();
+      enriched = enriched.filter((l: any) =>
+        (l.user_email || "").toLowerCase().includes(s) ||
+        (orgNames[l.org_id] || "").toLowerCase().includes(s),
+      );
+    }
+
+    res.json({ data: enriched, total: count || 0, page, limit });
+  } catch (err) {
+    console.error("Admin /api/admin/activity error:", err);
+    res.status(500).json({ error: "Failed to fetch activity" });
+  }
+});
+
+// ── GET /api/admin/abuse — run abuse detection queries ──
+app.get("/api/admin/abuse", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const warnings: any[] = [];
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Rule 1: Excessive uploads (3x daily plan limit)
+    const { data: dailyUploads } = await supabase
+      .from("invoices")
+      .select("org_id,uploaded_at")
+      .gte("uploaded_at", todayStart);
+
+    const uploadCounts: Record<string, number> = {};
+    (dailyUploads || []).forEach((inv: any) => {
+      uploadCounts[inv.org_id] = (uploadCounts[inv.org_id] || 0) + 1;
+    });
+
+    const { data: orgs } = await supabase.from("organizations").select("id,name,plan,invoice_limit_per_month");
+    (orgs || []).forEach((org: any) => {
+      const count = uploadCounts[org.id] || 0;
+      const dailyLimit = ((org.invoice_limit_per_month || 100) / 30) * 3;
+      if (count > dailyLimit) {
+        warnings.push({
+          type: "abuse",
+          rule: "High volume upload",
+          severity: "warning",
+          org_id: org.id,
+          org_name: org.name,
+          description: `Uploaded ${count} invoices today (${Math.round(dailyLimit)} daily limit)`,
+          detected_at: now.toISOString(),
+        });
+      }
+    });
+
+    // Rule 2: Rapid account creation (>3 members in 1 hour)
+    const { data: recentMembers } = await supabase
+      .from("org_members")
+      .select("org_id,created_at")
+      .gte("created_at", oneHourAgo);
+
+    const memberCounts: Record<string, number> = {};
+    (recentMembers || []).forEach((m: any) => {
+      memberCounts[m.org_id] = (memberCounts[m.org_id] || 0) + 1;
+    });
+
+    (orgs || []).forEach((org: any) => {
+      const count = memberCounts[org.id] || 0;
+      if (count > 3) {
+        warnings.push({
+          type: "abuse",
+          rule: "Rapid user creation",
+          severity: "warning",
+          org_id: org.id,
+          org_name: org.name,
+          description: `${count} users created in the last hour (limit: 3)`,
+          detected_at: now.toISOString(),
+        });
+      }
+    });
+
+    // Rule 3: High dispute volume (>20 in a day)
+    const { data: recentDisputes } = await supabase
+      .from("disputes")
+      .select("org_id,created_at")
+      .gte("created_at", todayStart);
+
+    const disputeCounts: Record<string, number> = {};
+    (recentDisputes || []).forEach((d: any) => {
+      disputeCounts[d.org_id] = (disputeCounts[d.org_id] || 0) + 1;
+    });
+
+    (orgs || []).forEach((org: any) => {
+      const count = disputeCounts[org.id] || 0;
+      if (count > 20) {
+        warnings.push({
+          type: "abuse",
+          rule: "High dispute volume",
+          severity: "warning",
+          org_id: org.id,
+          org_name: org.name,
+          description: `${count} disputes generated today (limit: 20)`,
+          detected_at: now.toISOString(),
+        });
+      }
+    });
+
+    // Rule 5: Inactive paid orgs (zero invoices in 30 days)
+    const { data: recentInvoiceOrgs } = await supabase
+      .from("invoices")
+      .select("org_id")
+      .gte("uploaded_at", thirtyDaysAgo);
+
+    const activeOrgIds = new Set((recentInvoiceOrgs || []).map((i: any) => i.org_id));
+
+    (orgs || []).forEach((org: any) => {
+      const plan = (org.plan || "free").toLowerCase();
+      if (plan !== "free" && plan !== "starter" && !activeOrgIds.has(org.id)) {
+        warnings.push({
+          type: "info",
+          rule: "Inactive paid org",
+          severity: "info",
+          org_id: org.id,
+          org_name: org.name,
+          description: `On ${org.plan} plan but no invoices in 30 days`,
+          detected_at: now.toISOString(),
+        });
+      }
+    });
+
+    // Filter out dismissed warnings (stored in admin_notes as "dismissed_warning:{rule}:{org_id}")
+    const { data: dismissedNotes } = await supabase
+      .from("admin_notes")
+      .select("note_text")
+      .ilike("note_text", "dismissed_warning:%");
+
+    const dismissedKeys = new Set(
+      (dismissedNotes || []).map((n: any) => n.note_text.replace("dismissed_warning:", "")),
+    );
+
+    const filteredWarnings = warnings.filter(
+      (w) => !dismissedKeys.has(`${w.rule}:${w.org_id}`),
+    );
+
+    res.json({ warnings: filteredWarnings, total: filteredWarnings.length });
+  } catch (err) {
+    console.error("Admin /api/admin/abuse error:", err);
+    res.status(500).json({ error: "Failed to run abuse detection" });
+  }
+});
+
+// ── POST /api/admin/notes — save admin note ──
+app.post("/api/admin/notes", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { org_id, note_text } = req.body;
+
+    if (!org_id || !note_text) {
+      return res.status(400).json({ error: "org_id and note_text required" });
+    }
+
+    const { data, error } = await supabase
+      .from("admin_notes")
+      .insert({ org_id, note_text, written_by: (req as any).adminUser?.id })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ data });
+  } catch (err) {
+    console.error("Admin POST /api/admin/notes error:", err);
+    res.status(500).json({ error: "Failed to save note" });
+  }
+});
+
 export default app;

@@ -20,6 +20,7 @@ import DashboardPage from '../app/dashboard/page';
 import InvoiceUploadPage from '../app/invoices/upload/page';
 import InvoiceDetailPage from '../app/invoices/[id]/page';
 import InvoicesPage from '../app/invoices/page';
+import AdminApp from './components/admin/AdminApp';
 import { createClient } from '../lib/supabase/client';
 import { 
   ShieldCheck, Landmark, FileText, Mail, PieChart, Terminal, User, Sparkles, X
@@ -421,6 +422,10 @@ export default function App() {
         }}
       />
     );
+  }
+
+  if (normalizedPath.startsWith('/admin')) {
+    return <AdminApp />;
   }
 
   // Path routing mapping

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { 
   LayoutDashboard, FileText, FileSignature, AlertCircle, 
-  BarChart2, Settings, LogOut, X, User
+  BarChart2, Settings, LogOut, X, User, ShieldCheck
 } from 'lucide-react';
 import { useRole } from '@/lib/auth/RoleContext';
 
@@ -13,6 +13,7 @@ export default function Sidebar() {
   const [pathname, setPathname] = useState('/dashboard');
   const [userEmail, setUserEmail] = useState('audit@atlaslogistics.com');
   const [userName, setUserName] = useState('Atlas Audit Team');
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -60,6 +61,22 @@ export default function Sidebar() {
         } catch (e) {}
       }
     }
+  }, []);
+
+  useEffect(() => {
+    async function checkAdmin() {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch('/api/admin/check', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const data = await res.json();
+        setIsSuperAdmin(!!data.isAdmin);
+      } catch {}
+    }
+    checkAdmin();
   }, []);
 
   const navigateTo = (path: string, e: React.MouseEvent) => {
@@ -190,6 +207,25 @@ export default function Sidebar() {
                 </a>
               );
             })}
+            {isSuperAdmin && (
+              <>
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-3 mt-4 mb-2 block">
+                  Admin
+                </span>
+                <a
+                  href="/admin"
+                  onClick={(e) => navigateTo('/admin', e)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg mx-0 text-sm font-medium transition-colors duration-150 ${
+                    pathname.startsWith('/admin')
+                      ? 'text-indigo-600 bg-indigo-50 border-l-2 border-indigo-600 -ml-[1px] pl-[13px]'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <ShieldCheck size={16} className="shrink-0" />
+                  <span>Admin Panel</span>
+                </a>
+              </>
+            )}
           </nav>
         </div>
 

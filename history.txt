@@ -111,3 +111,42 @@
 
 - **Fix: Column alignment in All/Batch tabs:**
   - `DataTable.tsx`: batch header row now uses 8 individual `<td>` elements instead of `colSpan={4}`, ensuring all rows have identical column structure for proper alignment
+
+- **Fix: "Edit Agreement" still showing empty form (GET endpoint missing):**
+  - Added `GET /api/contracts/:id` route to Express API (`api/_app.ts`) — was completely missing, causing the fetch in ContractForm to 404 silently
+  - `ContractForm.tsx`: added `useEffect([resolvedContract])` to sync form fields (carrierName, effectiveDate, expiryDate, minimumCharge, currency, chargeItems) when API fetch completes
+  - `ContractForm.tsx`: `loadingContract` initial state now `!!contractId && !contract` (true when we know we need to fetch), preventing empty form flash before fetch starts
+
+- **Removed Integrations tab from Settings:**
+  - `app/settings/page.tsx`: removed integrations tab button, content panel, unused state variables (`loadingIntegrations`, `gmailConfigured`, `anthropicKey`, `isAnthropicConnected`, `showAnthropicKey`), `handleSaveIntegrations` handler, and unused icon imports (`Sliders`, `Sparkles`, `Mail`, `Eye`, `EyeOff`, `CheckCircle`)
+
+- **Created marketing overview document:**
+  - Created `FREIGHTAUDIT_AI_OVERVIEW.md` with full project description, problem/solution, workflow guide, features table, target personas, tech stack, and pricing
+
+## 2026-06-24 — Super Admin Dashboard (Full Build)
+- **Architecture discovery:** Identified project is Vite + Express SPA (not standard Next.js). Adapted admin dashboard build accordingly — no middleware.ts, no server components, all client-side.
+- **Security layer:**
+  - Created `src/components/admin/useAdminAuth.ts` — React hook that calls `/api/admin/check` (server-side, uses service role key) to verify super admin status without RLS issues
+  - Created `api/_app.ts` `requireSuperAdmin` Express middleware — verifies JWT token + super_admins table membership before any admin API route
+  - Added `/api/admin/check` public endpoint (before middleware) for client-side super admin verification
+  - Admin pages redirect to `/auth/login` via `window.location.href` if not authenticated as super admin
+- **Modified `src/App.tsx`:** Added `AdminApp` import + `/admin` route case (renders before existing route chain)
+- **Modified `api/_app.ts`:** Added 12 admin API routes — stats, orgs (list/detail/patch), users (list/patch), revenue, activity, abuse, notes — all behind `requireSuperAdmin` middleware
+- **Modified `components/layout/Sidebar.tsx`:** Added dynamic "Admin Panel" link that fetches `/api/admin/check` and only renders for super admins (under "Admin" nav section)
+- **Admin pages created** (`src/components/admin/`):
+  - `AdminApp.tsx` — Shell with auth guard, sidebar, topbar, and sub-routing for all admin pages
+  - `AdminSidebar.tsx` — 200px fixed dark sidebar, nav groups (OVERVIEW/USERS/FINANCIAL/SYSTEM), active state tracking, "Back to App" link
+  - `AdminTopBar.tsx` — Live clock, "Super Admin" fuchsia badge, avatar
+  - `AdminStatCard.tsx` — Reusable stat card (label, value, trend)
+  - `AdminOverview.tsx` — 4 stat cards (orgs, users, invoices, savings) + recent orgs table + recent activity feed
+  - `AdminOrganizations.tsx` — Search/filter table with plan/status badges, links to detail
+  - `AdminOrgDetail.tsx` — Full org info, members table with suspend/unsuspend, recent invoices, admin notes (read/write), usage bar, danger zone (suspend/change plan)
+  - `AdminUsers.tsx` — Searchable user table with role badges, inline suspend/unsuspend + view detail link
+  - `AdminUserDetail.tsx` — User profile card, activity timeline, danger zone
+  - `AdminRevenue.tsx` — MRR/ARR stat cards, stacked bar chart (12 months), pie chart (plan distribution), per-org breakdown table with utilization progress bars
+  - `AdminActivity.tsx` — Filterable audit log feed (date range, action type, search), user emails enriched from auth.users, pagination, CSV export
+  - `AdminAbuse.tsx` — 4 detection rules (high uploads, rapid user creation, high dispute volume, inactive paid orgs), persistent dismissals via admin_notes, auto-refresh every 30s, manual refresh button
+  - `AdminSettings.tsx` — Plan limits display, current super admin info, CSV export buttons
+- **Design system:** Dark theme (#09090B background, #111113 surfaces, #E879F9 fuchsia accent, Geist/Inter font, JetBrains Mono for numbers) — completely separate from main app's indigo/gray design
+- **FK join fixes:** Resolved PostgREST foreign key relationship errors across orgs, users, and activity routes by removing join syntax and enriching with separate queries
+- **Settings freeze fix:** Removed direct `super_admins` query from browser (RLS hung) — now shows current session user info instead
