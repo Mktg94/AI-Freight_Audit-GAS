@@ -51,7 +51,7 @@ export default function AdminOverview() {
   if (loading) {
     return (
       <div className="flex items-center gap-3 py-20 justify-center">
-        <div className="w-4 h-4 border-2 border-fuchsia-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
         <span className="text-zinc-400 text-sm">Loading dashboard...</span>
       </div>
     );
@@ -63,12 +63,12 @@ export default function AdminOverview() {
 
   const planBadge = (plan: string) => {
     const styles: Record<string, string> = {
-      free: 'bg-zinc-800 text-zinc-400 border-zinc-700',
-      starter: 'bg-orange-400/10 text-orange-400 border-orange-400/20',
-      professional: 'bg-blue-400/10 text-blue-400 border-blue-400/20',
-      enterprise: 'bg-fuchsia-400/10 text-fuchsia-400 border-fuchsia-400/20',
+      free: 'bg-zinc-800 text-zinc-400',
+      starter: 'bg-orange-400/10 text-orange-400',
+      professional: 'bg-blue-400/10 text-blue-400',
+      enterprise: 'bg-blue-400/10 text-blue-400',
     };
-    return <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 border ${styles[plan.toLowerCase()] || styles.free}`}>{plan}</span>;
+    return <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${styles[plan.toLowerCase()] || styles.free}`}>{plan}</span>;
   };
 
   function timeAgo(dateStr: string): string {
@@ -109,31 +109,30 @@ export default function AdminOverview() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Organizations */}
-        <div className="bg-[#111113] border border-[#27272A] rounded-xl overflow-hidden">
-          <div className="bg-[#18181B] border-b border-[#27272A] px-4 py-2.5 flex items-center justify-between">
+        <div className="bg-[#121212] rounded-2xl overflow-hidden">
+          <div className="bg-[#1A1A1A] px-5 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Building2 className="w-3.5 h-3.5 text-zinc-400" />
-              <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Recent Organizations</span>
+              <Building2 className="w-3.5 h-3.5 text-zinc-500" />
+              <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-[0.12em]">Recent Organizations</span>
             </div>
             <a
               href="/admin/organizations"
               onClick={(e) => { e.preventDefault(); window.history.pushState({}, '', '/admin/organizations'); window.dispatchEvent(new Event('popstate')); }}
-              className="text-[10px] text-fuchsia-400 hover:text-fuchsia-300 transition-colors"
+              className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors"
             >View all</a>
           </div>
-          <div className="divide-y divide-[#1C1C1F]">
+          <div className="divide-y divide-white/[0.03]">
             {recentOrgs.map((org: any) => (
-              <div key={org.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-[#18181B] transition-colors">
+              <div key={org.id} className="flex items-center justify-between px-5 py-3 hover:bg-[#1A1A1A] transition-colors duration-200">
                 <div>
                   <a
                     href={`/admin/organizations/${org.id}`}
                     onClick={(e) => { e.preventDefault(); window.history.pushState({}, '', `/admin/organizations/${org.id}`); window.dispatchEvent(new Event('popstate')); }}
-                    className="text-sm text-zinc-200 hover:text-fuchsia-400 transition-colors"
+                    className="text-sm text-zinc-200 hover:text-blue-400 transition-colors"
                   >{org.name}</a>
-                  <p className="text-[10px] font-mono text-zinc-600">{org.owner_email}</p>
+                  <p className="text-[10px] font-mono text-zinc-600 mt-0.5">{org.owner_email}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   {planBadge(org.plan)}
                   <span className="text-[10px] font-mono text-zinc-600">{org.members} members</span>
                 </div>
@@ -142,15 +141,14 @@ export default function AdminOverview() {
           </div>
         </div>
 
-        {/* Recent Activity */}
-        <div className="bg-[#111113] border border-[#27272A] rounded-xl overflow-hidden">
-          <div className="bg-[#18181B] border-b border-[#27272A] px-4 py-2.5 flex items-center gap-2">
-            <Activity className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Recent Activity</span>
+        <div className="bg-[#121212] rounded-2xl overflow-hidden">
+          <div className="bg-[#1A1A1A] px-5 py-3 flex items-center gap-2">
+            <Activity className="w-3.5 h-3.5 text-zinc-500" />
+            <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-[0.12em]">Recent Activity</span>
           </div>
-          <div className="divide-y divide-[#1C1C1F] max-h-[320px] overflow-y-auto">
+          <div className="divide-y divide-white/[0.03] max-h-[320px] overflow-y-auto">
             {recentActivity.map((log: any) => (
-              <div key={log.id} className="px-4 py-2.5 hover:bg-[#18181B] transition-colors">
+              <div key={log.id} className="px-5 py-3 hover:bg-[#1A1A1A] transition-colors duration-200">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-xs text-zinc-300">{log.action}</p>
                   <span className="text-[10px] font-mono text-zinc-600 shrink-0">{timeAgo(log.created_at)}</span>

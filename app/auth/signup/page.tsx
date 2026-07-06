@@ -101,17 +101,36 @@ export default function SignupPage({ onSignupSuccess, onNavigateToLogin }: Signu
         throw new Error('No user data returned from Auth gateway.');
       }
 
-      const { error: orgError } = await supabase
+      const { data: orgData, error: orgError } = await supabase
         .from('organizations')
         .insert([
           {
             name: companyName,
             owner_id: data.user.id
           }
-        ]);
+        ])
+        .select()
+        .single();
 
       if (orgError) {
         console.error('Failed to create company entry, but auth occurred:', orgError);
+      }
+
+      if (orgData) {
+        const { error: memberError } = await supabase
+          .from('org_members')
+          .insert([
+            {
+              org_id: orgData.id,
+              user_id: data.user.id,
+              role: 'admin',
+              status: 'active'
+            }
+          ]);
+
+        if (memberError) {
+          console.error('Failed to add org member record:', memberError);
+        }
       }
 
       if (onSignupSuccess) {

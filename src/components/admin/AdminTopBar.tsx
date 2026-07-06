@@ -17,15 +17,15 @@ export default function AdminTopBar({ title, user }: { title: string; user: any 
   const initials = userEmail.charAt(0).toUpperCase();
 
   return (
-    <header className="h-12 bg-[#09090B] border-b border-[#18181B] flex items-center justify-between px-6">
+    <header className="h-14 bg-[#0A0A0A] flex items-center justify-between px-8">
       <h1 className="text-zinc-100 font-semibold text-sm">{title}</h1>
-      <div className="flex items-center gap-3">
-        <span className="font-mono text-xs text-zinc-500">{time}</span>
-        <span className="text-zinc-700">|</span>
-        <span className="text-[10px] font-medium text-fuchsia-400 bg-fuchsia-500/10 border border-fuchsia-500/20 rounded-full px-2 py-0.5">
+      <div className="flex items-center gap-4">
+        <span className="font-mono text-xs text-zinc-600">{time}</span>
+        <div className="w-px h-4 bg-zinc-800" />
+        <span className="text-[11px] font-medium text-blue-400 bg-blue-500/8 px-2.5 py-0.5 rounded-lg">
           Super Admin
         </span>
-        <div className="w-6 h-6 rounded-full bg-fuchsia-500 flex items-center justify-center text-white text-[10px] font-bold">
+        <div className="w-7 h-7 rounded-xl bg-blue-500 flex items-center justify-center text-white text-[11px] font-bold shadow-lg shadow-blue-500/15">
           {initials}
         </div>
       </div>

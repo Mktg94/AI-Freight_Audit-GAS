@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '../../../lib/supabase/client';
-import { ArrowLeft, User, FileText, Clock } from 'lucide-react';
+import { ArrowLeft, User, Clock } from 'lucide-react';
 
 export default function AdminUserDetail() {
   const userId = window.location.pathname.split('/').pop() || '';
@@ -14,7 +14,6 @@ export default function AdminUserDetail() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      // Fetch user info from org_members
       const res = await fetch('/api/admin/users?limit=100', {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -22,7 +21,6 @@ export default function AdminUserDetail() {
       const found = (data.data || []).find((u: any) => u.user_id === userId);
       setUserData(found || null);
 
-      // Fetch activity for this user
       const actRes = await fetch(`/api/admin/activity?search=${userId}&limit=30`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -50,7 +48,7 @@ export default function AdminUserDetail() {
   if (loading) {
     return (
       <div className="flex items-center gap-3 py-20 justify-center">
-        <div className="w-4 h-4 border-2 border-fuchsia-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
         <span className="text-zinc-400 text-sm">Loading user...</span>
       </div>
     );
@@ -61,47 +59,45 @@ export default function AdminUserDetail() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-4xl">
       <a
         href="/admin/users"
         onClick={(e) => { e.preventDefault(); window.history.pushState({}, '', '/admin/users'); window.dispatchEvent(new Event('popstate')); }}
-        className="flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-200 transition-colors"
+        className="flex items-center gap-2 text-xs text-zinc-600 hover:text-zinc-200 transition-colors"
       >
         <ArrowLeft className="w-3 h-3" /> Back to Users
       </a>
 
-      {/* Header card */}
-      <div className="bg-[#111113] border border-[#27272A] rounded-xl p-5 flex items-start gap-4">
-        <div className="w-10 h-10 rounded-full bg-fuchsia-500 flex items-center justify-center text-white text-sm font-bold shrink-0">
+      <div className="bg-[#121212] rounded-2xl p-6 flex items-start gap-4">
+        <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-lg shadow-blue-500/15">
           {userData.name.charAt(0).toUpperCase()}
         </div>
         <div className="flex-1">
           <h2 className="text-zinc-100 font-semibold text-base">{userData.name}</h2>
-          <p className="text-xs font-mono text-zinc-400 mt-0.5">{userData.email}</p>
-          <div className="flex items-center gap-3 mt-2">
-            <span className="text-xs text-zinc-500">Role: <span className="text-zinc-300">{userData.role}</span></span>
-            <span className="text-xs text-zinc-500">Org: <a
+          <p className="text-xs font-mono text-zinc-500 mt-1">{userData.email}</p>
+          <div className="flex items-center gap-4 mt-3">
+            <span className="text-xs text-zinc-600">Role: <span className="text-zinc-300">{userData.role}</span></span>
+            <span className="text-xs text-zinc-600">Org: <a
               href={`/admin/organizations/${userData.org_id}`}
               onClick={(e) => { e.preventDefault(); window.history.pushState({}, '', `/admin/organizations/${userData.org_id}`); window.dispatchEvent(new Event('popstate')); }}
-              className="text-fuchsia-400 hover:text-fuchsia-300 transition-colors"
+              className="text-blue-400 hover:text-blue-300 transition-colors"
             >{userData.org_name}</a></span>
-            <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 border ${userData.status === 'active' ? 'bg-green-400/10 text-green-400 border-green-400/20' : 'bg-red-400/10 text-red-400 border-red-400/20'}`}>
+            <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${userData.status === 'active' ? 'bg-green-400/10 text-green-400' : 'bg-red-400/10 text-red-400'}`}>
               {userData.status}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Activity timeline */}
-      <div className="bg-[#111113] border border-[#27272A] rounded-xl p-5 space-y-3">
+      <div className="bg-[#121212] rounded-2xl p-6 space-y-3">
         <div className="flex items-center gap-2">
-          <Clock className="w-3.5 h-3.5 text-zinc-400" />
-          <h3 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Recent Activity</h3>
+          <Clock className="w-3.5 h-3.5 text-zinc-500" />
+          <h3 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-[0.12em]">Recent Activity</h3>
         </div>
-        <div className="space-y-2 max-h-[400px] overflow-y-auto">
+        <div className="space-y-1 max-h-[400px] overflow-y-auto">
           {activity.map((log: any) => (
-            <div key={log.id} className="flex items-start gap-3 py-2 border-b border-[#1C1C1F] last:border-0">
-              <span className="text-xs mt-0.5 text-zinc-600 font-mono">{new Date(log.created_at).toLocaleString()}</span>
+            <div key={log.id} className="flex items-start gap-3 py-2.5 px-1 hover:bg-[#1A1A1A] rounded-xl transition-colors duration-200">
+              <span className="text-xs text-zinc-600 font-mono shrink-0 mt-0.5">{new Date(log.created_at).toLocaleString()}</span>
               <span className="text-sm text-zinc-300">{log.action}</span>
             </div>
           ))}
@@ -111,12 +107,11 @@ export default function AdminUserDetail() {
         </div>
       </div>
 
-      {/* Danger zone */}
-      <div className="bg-[#111113] border border-red-400/20 rounded-xl p-5 space-y-3">
-        <h3 className="text-[10px] font-semibold text-red-400 uppercase tracking-widest">Danger Zone</h3>
+      <div className="bg-[#121212] rounded-2xl p-6 space-y-3 ring-1 ring-red-400/15">
+        <h3 className="text-[10px] font-semibold text-red-400 uppercase tracking-[0.12em]">Danger Zone</h3>
         <button
           onClick={toggleSuspend}
-          className="bg-transparent hover:bg-red-400/10 text-red-400 border border-red-400/20 hover:border-red-400/40 text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
+          className="bg-red-400/5 hover:bg-red-400/15 text-red-400 text-xs font-medium px-4 py-2 rounded-xl transition-all duration-200"
         >
           {userData.status === 'active' ? 'Suspend User' : 'Unsuspend User'}
         </button>

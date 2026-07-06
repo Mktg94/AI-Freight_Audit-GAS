@@ -64,26 +64,48 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
-          // Fallback: direct Supabase query
-          const { data: orgData } = await supabase
+          // Fallback: find the user's own org (owner or member)
+          const { data: userOrg } = await supabase
             .from('organizations')
             .select('id, owner_id')
+            .eq('owner_id', user.id)
             .limit(1)
             .maybeSingle();
 
-          if (orgData) {
-            setOrgId(orgData.id);
+          let foundOrg = userOrg || null;
+
+          if (!foundOrg) {
+            const { data: memberOrg } = await supabase
+              .from('org_members')
+              .select('org_id')
+              .eq('user_id', user.id)
+              .eq('status', 'active')
+              .limit(1)
+              .maybeSingle();
+
+            if (memberOrg?.org_id) {
+              const { data: orgData } = await supabase
+                .from('organizations')
+                .select('id, owner_id')
+                .eq('id', memberOrg.org_id)
+                .single();
+              foundOrg = orgData || null;
+            }
+          }
+
+          if (foundOrg) {
+            setOrgId(foundOrg.id);
 
             const { data: memberData } = await supabase
               .from('org_members')
               .select('role')
-              .eq('org_id', orgData.id)
+              .eq('org_id', foundOrg.id)
               .eq('user_id', user.id)
               .maybeSingle();
 
             if (memberData?.role) {
               setRoleState(memberData.role as UserRole);
-            } else if (orgData.owner_id === user.id) {
+            } else if (foundOrg.owner_id === user.id) {
               setRoleState('admin');
             } else {
               setRoleState('operations_coordinator');

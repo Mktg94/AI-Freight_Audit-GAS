@@ -7,7 +7,7 @@ const actionIcons: Record<string, { icon: string; color: string }> = {
   line_item_approved: { icon: '✓', color: 'text-green-400' },
   line_item_disputed: { icon: '⚡', color: 'text-orange-400' },
   dispute_sent: { icon: '→', color: 'text-orange-400' },
-  dispute_resolved: { icon: '●', color: 'text-fuchsia-400' },
+  dispute_resolved: { icon: '●', color: 'text-blue-400' },
   contract_created: { icon: '✦', color: 'text-blue-400' },
   user_invited: { icon: '+', color: 'text-zinc-400' },
   user_removed: { icon: '✕', color: 'text-red-400' },
@@ -84,11 +84,11 @@ export default function AdminActivity() {
             placeholder="Search by email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#18181B] border border-[#3F3F46] rounded-lg text-zinc-100 text-sm placeholder:text-zinc-600 pl-9 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-fuchsia-500/50"
+            className="w-full bg-[#1A1A1A] rounded-xl text-zinc-100 text-sm placeholder:text-zinc-600 pl-9 pr-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
           />
         </div>
         <select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}
-          className="bg-[#18181B] border border-[#3F3F46] rounded-lg text-zinc-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-fuchsia-500/50">
+          className="bg-[#1A1A1A] rounded-xl text-zinc-100 text-sm px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500/50">
           <option value="all">All Actions</option>
           <option value="invoice_uploaded">Uploads</option>
           <option value="line_item_approved">Approvals</option>
@@ -99,28 +99,28 @@ export default function AdminActivity() {
           <option value="user_invited">Invites</option>
         </select>
         <button onClick={exportCSV}
-          className="bg-transparent hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 hover:border-zinc-700 text-xs font-medium px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5"
+          className="bg-[#1A1A1A] hover:bg-[#222] text-zinc-400 hover:text-zinc-200 text-xs font-medium px-4 py-2.5 rounded-xl transition-all duration-200 flex items-center gap-1.5"
         >
           <Download className="w-3 h-3" /> Export CSV
         </button>
       </div>
 
-      <div className="bg-[#111113] border border-[#27272A] rounded-xl overflow-hidden">
+      <div className="bg-[#121212] rounded-2xl overflow-hidden">
         {loading ? (
           <div className="flex items-center gap-3 py-20 justify-center">
-            <div className="w-4 h-4 border-2 border-fuchsia-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
             <span className="text-zinc-400 text-sm">Loading activity...</span>
           </div>
         ) : (
-          <div className="divide-y divide-[#1C1C1F]">
+          <div className="divide-y divide-white/[0.03]">
             {logs.map((log: any) => {
               const action = actionIcons[log.action] || { icon: '•', color: 'text-zinc-500' };
               return (
-                <div key={log.id} className="flex items-start gap-3 px-4 py-3 hover:bg-[#18181B] transition-colors">
+                <div key={log.id} className="flex items-start gap-3 px-5 py-3 hover:bg-[#1A1A1A] transition-colors duration-200">
                   <span className={`text-xs font-mono mt-0.5 ${action.color}`}>{action.icon}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-zinc-300">
-                      <span className="font-mono text-xs text-zinc-500">{log.user_email || 'unknown'}</span>
+                      <span className="font-mono text-xs text-zinc-600">{log.user_email || 'unknown'}</span>
                       {' '}{describeAction(log)}
                     </p>
                     <p className="text-[11px] text-zinc-600 mt-0.5">{log.org?.name || 'Unknown org'}</p>
@@ -143,9 +143,9 @@ export default function AdminActivity() {
           <span>{total} total entries</span>
           <div className="flex gap-2">
             <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
-              className="px-3 py-1 rounded-lg border border-zinc-800 disabled:opacity-30 hover:bg-zinc-800 transition-colors">Previous</button>
+              className="px-3 py-1.5 rounded-xl bg-[#1A1A1A] disabled:opacity-30 hover:bg-[#222] transition-colors duration-200">Previous</button>
             <button onClick={() => setPage(p => p + 1)}
-              className="px-3 py-1 rounded-lg border border-zinc-800 hover:bg-zinc-800 transition-colors">Next</button>
+              className="px-3 py-1.5 rounded-xl bg-[#1A1A1A] hover:bg-[#222] transition-colors duration-200">Next</button>
           </div>
         </div>
       )}

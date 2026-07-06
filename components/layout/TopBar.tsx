@@ -1,13 +1,38 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Menu, Bell, Check, Shield } from 'lucide-react';
+import { Menu, Bell, Shield } from 'lucide-react';
 
 export default function TopBar() {
   const [initials, setInitials] = useState('AA');
   const [showNotifications, setShowNotifications] = useState(false);
-  const [hasNotifications, setHasNotifications] = useState(true);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  const fetchNotifications = useCallback(async () => {
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      const res = await fetch('/api/notifications', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications || []);
+        const lastSeen = localStorage.getItem('fa_last_seen_notification');
+        const count = (data.notifications || []).filter(
+          (n: any) => !lastSeen || new Date(n.created_at).getTime() > parseInt(lastSeen),
+        ).length;
+        setUnreadCount(count);
+      }
+    } catch {}
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     const getInitials = (nameStr: string) => {
@@ -42,17 +67,24 @@ export default function TopBar() {
         } catch (e) {}
       }
     }
-  }, []);
+
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  const handleOpenNotifications = () => {
+    setShowNotifications(!showNotifications);
+    if (!showNotifications) {
+      localStorage.setItem('fa_last_seen_notification', Date.now().toString());
+      setUnreadCount(0);
+    }
+  };
 
   const triggerMobileMenu = () => {
     const event = new CustomEvent('toggle-sidebar');
     window.dispatchEvent(event);
   };
-
-  const notificationList = [
-    { id: 1, text: "Invoice #INV-2041 billing discrepancy of $240.00 audited & flag raised.", time: "10 mins ago" },
-    { id: 2, text: "YRC Carrier representative downloaded approved settlement credit.", time: "2 hrs ago" },
-  ];
 
   return (
     <header 
@@ -60,7 +92,6 @@ export default function TopBar() {
       className="bg-white border-b border-gray-100 h-14 flex items-center justify-between px-6 sticky top-0 z-30"
     >
       
-      {/* Left: Mobile hamburger + status */}
       <div className="flex items-center gap-4">
         <button
           onClick={triggerMobileMenu}
@@ -76,34 +107,35 @@ export default function TopBar() {
         </div>
       </div>
 
-      {/* Right: Notifications + Avatar */}
       <div className="flex items-center gap-4 relative">
         
-        {/* Notification Bell */}
         <div className="relative">
           <button
-            onClick={() => {
-              setShowNotifications(!showNotifications);
-              setHasNotifications(false);
-            }}
+            onClick={handleOpenNotifications}
             className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-50 rounded-lg transition-colors relative cursor-pointer"
             title="Notifications"
           >
             <Bell size={16} />
-            {hasNotifications && (
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
             )}
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-2.5 w-72 bg-white border border-gray-100 rounded-xl p-4 shadow-lg z-50 space-y-3">
+            <div className="absolute right-0 mt-2.5 w-80 bg-white border border-gray-100 rounded-xl p-4 shadow-lg z-50 space-y-3">
               <div className="flex justify-between items-center pb-2 border-b border-gray-100">
-                <span className="text-[10px] uppercase font-bold text-gray-900 tracking-wider">Carrier Billing Alerts</span>
-                <span className="text-[9px] text-indigo-600 font-semibold flex items-center gap-0.5"><Check size={8} /> Sync Active</span>
+                <span className="text-[10px] uppercase font-bold text-gray-900 tracking-wider">
+                  {loading ? 'Loading...' : 'Notifications'}
+                </span>
               </div>
               
-              <div className="space-y-3.5 max-h-48 overflow-y-auto">
-                {notificationList.map((notif) => (
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {notifications.length === 0 && !loading && (
+                  <p className="text-[11px] text-gray-400 text-center py-4">No recent notifications</p>
+                )}
+                {notifications.map((notif: any) => (
                   <div key={notif.id} className="text-[11px] leading-relaxed text-left">
                      <p className="text-gray-700">{notif.text}</p>
                      <span className="text-[9px] text-gray-400 font-mono mt-0.5 block">{notif.time}</span>
@@ -114,10 +146,8 @@ export default function TopBar() {
           )}
         </div>
 
-        {/* Divider */}
         <span className="w-px h-5 bg-gray-200" />
 
-        {/* User avatar initials */}
         <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 text-xs font-semibold font-mono flex items-center justify-center select-none">
           {initials}
         </div>

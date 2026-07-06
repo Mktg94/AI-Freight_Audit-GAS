@@ -37,23 +37,23 @@ export default function AdminSidebar({ currentPath, user }: { currentPath: strin
   const initials = userEmail.charAt(0).toUpperCase();
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-[200px] bg-[#09090B] border-r border-[#18181B] flex flex-col z-50">
-      <div className="p-4 border-b border-[#18181B]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 bg-fuchsia-500 rounded-md flex items-center justify-center">
-            <span className="text-white text-[10px] font-bold">FA</span>
+    <aside className="fixed left-0 top-0 h-screen w-[200px] bg-[#0A0A0A] flex flex-col z-50">
+      <div className="p-5 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/15">
+            <span className="text-white text-[11px] font-bold">FA</span>
           </div>
           <div>
             <div className="text-zinc-100 font-semibold text-sm leading-tight">FreightAudit</div>
-            <div className="text-zinc-600 text-[10px] uppercase tracking-widest">Admin Console</div>
+            <div className="text-zinc-600 text-[10px] uppercase tracking-[0.15em]">Admin Console</div>
           </div>
         </div>
       </div>
 
-      <nav className="flex-1 py-3 space-y-4 overflow-y-auto">
+      <nav className="flex-1 py-2 space-y-5 overflow-y-auto">
         {navItems.map((group) => (
           <div key={group.section}>
-            <div className="px-4 mb-1 text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
+            <div className="px-5 mb-1.5 text-[9px] font-semibold text-zinc-600 uppercase tracking-[0.15em]">
               {group.section}
             </div>
             {group.items.map((item) => {
@@ -68,13 +68,13 @@ export default function AdminSidebar({ currentPath, user }: { currentPath: strin
                     window.history.pushState({}, '', item.path);
                     window.dispatchEvent(new Event('popstate'));
                   }}
-                  className={`flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg text-sm transition-colors ${
+                  className={`group flex items-center gap-2.5 px-5 py-2 text-sm transition-all duration-200 ${
                     active
-                      ? 'bg-[#18181B] text-zinc-100 border-l-2 border-fuchsia-500 pl-[10px]'
-                      : 'text-zinc-500 hover:text-zinc-300 hover:bg-[#111113]'
+                      ? 'text-zinc-100 bg-[#1A1A1A]'
+                      : 'text-zinc-500 hover:text-zinc-200 hover:bg-[#121212]'
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  <Icon className={`w-4 h-4 shrink-0 transition-colors duration-200 ${active ? 'text-blue-400' : 'text-zinc-600 group-hover:text-zinc-400'}`} />
                   <span>{item.label}</span>
                 </a>
               );
@@ -83,12 +83,12 @@ export default function AdminSidebar({ currentPath, user }: { currentPath: strin
         ))}
       </nav>
 
-      <div className="border-t border-[#18181B] p-3 space-y-2">
-        <div className="flex items-center gap-2 px-3 py-2">
-          <div className="w-6 h-6 rounded-full bg-fuchsia-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+      <div className="p-4 space-y-2">
+        <div className="flex items-center gap-2.5 px-2 py-2">
+          <div className="w-7 h-7 rounded-xl bg-blue-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0">
             {initials}
           </div>
-          <span className="text-xs text-zinc-400 truncate">{userEmail}</span>
+          <span className="text-xs text-zinc-500 truncate">{userEmail}</span>
         </div>
         <a
           href="/dashboard"
@@ -97,9 +97,9 @@ export default function AdminSidebar({ currentPath, user }: { currentPath: strin
             window.history.pushState({}, '', '/dashboard');
             window.dispatchEvent(new Event('popstate'));
           }}
-          className="flex items-center gap-2 px-3 py-2 mx-2 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 hover:bg-[#111113] transition-colors"
+          className="flex items-center gap-2 px-2 py-2 text-xs text-zinc-600 hover:text-zinc-400 transition-colors duration-200"
         >
-          <ArrowLeft className="w-3 h-3" />
+          <ArrowLeft className="w-3.5 h-3.5" />
           <span>Back to App</span>
         </a>
       </div>

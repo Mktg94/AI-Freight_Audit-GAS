@@ -111,6 +111,18 @@ app.post("/api/contracts", async (req, res) => {
       .select()
       .single();
     if (error) throw error;
+
+    try {
+      const contractAuth = req.headers.authorization;
+      const contractUser = contractAuth?.startsWith("Bearer ")
+        ? (await supabase.auth.getUser(contractAuth.slice(7))).data?.user?.id : null;
+      await supabase.from("audit_logs").insert({
+        org_id, user_id: contractUser,
+        action: "contract_created", entity_type: "contract", entity_id: data.id,
+        metadata: { carrier_name: payload.carrier_name, contract_number: data.contract_number },
+      });
+    } catch {}
+
     res.json({ success: true, data });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to create contract", details: err.message });
@@ -198,7 +210,7 @@ app.post("/api/invoices/upload", uploadRouter.single("file"), async (req, res) =
         .insert({
           org_id,
           contract_id,
-          upload_type: 'single',
+          source: 'single',
           file_name: file.originalname,
           file_url: urlData.publicUrl,
           carrier_name: extractedInvoice.carrier_name,
@@ -306,7 +318,7 @@ app.post("/api/invoices/upload", uploadRouter.single("file"), async (req, res) =
 
       await supabase.from("audit_logs").insert({
         org_id,
-        user_id: req.body.user_id || "system",
+        user_id: req.body.user_id || null,
         action: "invoice_uploaded",
         entity_type: "invoice",
         entity_id: invoice.id,
@@ -440,7 +452,7 @@ app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, 
           .insert({
             org_id,
             contract_id,
-            upload_type: files.length > 1 ? 'batch' : 'single',
+            source: files.length > 1 ? 'batch' : 'single',
             file_name: file.originalname,
             file_url: urlData.publicUrl,
             carrier_name: extractedInvoice.carrier_name || "Unknown Carrier",
@@ -684,11 +696,14 @@ app.get("/api/invoices", async (req, res) => {
       }
     }
 
-    let query = supabase.from("invoices").select("*");
-    if (org_id) {
-      query = query.eq("org_id", org_id);
+    if (!org_id) {
+      return res.json({ success: true, data: [] });
     }
-    const { data, error } = await query.order("uploaded_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("invoices")
+      .select("*")
+      .eq("org_id", org_id)
+      .order("uploaded_at", { ascending: false });
     if (error) throw error;
     res.json({ success: true, data: data || [] });
   } catch (err: any) {
@@ -1228,6 +1243,17 @@ app.post("/api/disputes/:id/send", async (req, res) => {
       .single();
     if (updateErr) throw updateErr;
 
+    try {
+      const sendAuth = req.headers.authorization;
+      const sendUser = sendAuth?.startsWith("Bearer ")
+        ? (await supabase.auth.getUser(sendAuth.slice(7))).data?.user?.id : null;
+      await supabase.from("audit_logs").insert({
+        org_id: dispute.org_id, user_id: sendUser,
+        action: "dispute_sent", entity_type: "dispute", entity_id: id,
+        metadata: { carrier_name: dispute.carrier_name, amount: dispute.total_disputed_amount, invoice_number: invoiceNumber },
+      });
+    } catch {}
+
     res.json({ success: true, data: updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1282,6 +1308,17 @@ app.post("/api/disputes/:id/resolve", express.json(), async (req, res) => {
         .eq("id", dispute.invoice_id);
     }
 
+    try {
+      const resolveAuth = req.headers.authorization;
+      const resolveUser = resolveAuth?.startsWith("Bearer ")
+        ? (await supabase.auth.getUser(resolveAuth.slice(7))).data?.user?.id : null;
+      await supabase.from("audit_logs").insert({
+        org_id: dispute.org_id, user_id: resolveUser,
+        action: "dispute_resolved", entity_type: "dispute", entity_id: id,
+        metadata: { outcome: resolutionOutcome, amount: resolutionAmount, carrier_name: dispute.carrier_name },
+      });
+    } catch {}
+
     res.json({ success: true, disputeId: id });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1313,6 +1350,17 @@ app.post("/api/invoices/:id/approve", async (req, res) => {
       .select()
       .single();
     if (updateErr) throw updateErr;
+
+    try {
+      const approveAuth = req.headers.authorization;
+      const approveUser = approveAuth?.startsWith("Bearer ")
+        ? (await supabase.auth.getUser(approveAuth.slice(7))).data?.user?.id : null;
+      await supabase.from("audit_logs").insert({
+        org_id: invoice.org_id, user_id: approveUser,
+        action: "line_item_approved", entity_type: "invoice", entity_id: id,
+        metadata: { invoice_number: invoice.invoice_number, total_savings: savings },
+      });
+    } catch {}
 
     res.json({ success: true, data: updated });
   } catch (err: any) {
@@ -1409,36 +1457,41 @@ app.delete("/api/team/:memberId", async (req, res) => {
     const { memberId } = req.params;
     const hard = req.query.hard === "true";
 
-    console.log("🗑️ DELETE member:", memberId, "hard:", hard);
-
-    // Get current member status
+    // Get current member status (include email for notification message)
     const { data: member, error: fetchError } = await supabase
       .from("org_members")
-      .select("status, user_id")
+      .select("status, user_id, org_id, email")
       .eq("id", memberId)
       .maybeSingle();
 
     if (fetchError) {
-      console.error("❌ Fetch error:", fetchError);
       return res.status(500).json({ error: "Database error", details: fetchError.message });
     }
-
     if (!member) {
-      console.log("❌ Member not found:", memberId);
       return res.status(404).json({ error: "Member not found." });
     }
 
-    console.log("📋 Member status:", member.status, "user_id:", member.user_id);
-
-    // Hard delete for invited members or when ?hard=true
-    if (hard || member.status === "invited" || !member.user_id) {
+    // Hard delete for invited/suspended members or when ?hard=true
+    if (hard || member.status === "invited" || member.status === "suspended" || !member.user_id) {
       const { error } = await supabase
         .from("org_members")
         .delete()
         .eq("id", memberId);
-
       if (error) throw error;
-      console.log("✅ Hard deleted:", memberId);
+
+      // Audit log for hard delete
+      const delAuth = req.headers.authorization;
+      const actingUser = delAuth?.startsWith("Bearer ")
+        ? (await supabase.auth.getUser(delAuth.slice(7))).data?.user?.id : null;
+      try { await supabase.from("audit_logs").insert({
+        org_id: member.org_id,
+        user_id: actingUser,
+        action: "user_removed",
+        entity_type: "org_member",
+        entity_id: memberId,
+        metadata: { removed_user_id: member.user_id, removed_email: member.email },
+      }); } catch {}
+
       return res.json({ success: true, deleted: true });
     }
 
@@ -1450,7 +1503,20 @@ app.delete("/api/team/:memberId", async (req, res) => {
       .select()
       .single();
     if (error) throw error;
-    console.log("✅ Suspended:", memberId);
+
+    // Audit log for suspend
+    const suspendAuth = req.headers.authorization;
+    const suspendUser = suspendAuth?.startsWith("Bearer ")
+      ? (await supabase.auth.getUser(suspendAuth.slice(7))).data?.user?.id : null;
+    try { await supabase.from("audit_logs").insert({
+      org_id: member.org_id,
+      user_id: suspendUser,
+      action: "user_removed",
+      entity_type: "org_member",
+      entity_id: memberId,
+      metadata: { removed_user_id: member.user_id, removed_email: member.email },
+    }); } catch {}
+
     res.json({ success: true, data });
   } catch (err: any) {
     console.error("❌ Delete error:", err);
@@ -1585,6 +1651,19 @@ app.post("/api/team/invite", async (req, res) => {
 
       await sendExpressInviteEmail(email, role, token, orgId);
 
+      const bearerToken = req.headers.authorization;
+      const actingUserId = bearerToken?.startsWith("Bearer ")
+        ? (await supabase.auth.getUser(bearerToken.slice(7))).data?.user?.id
+        : null;
+      try { const { error: ie } = await supabase.from("audit_logs").insert({
+        org_id: orgId,
+        user_id: actingUserId,
+        action: "user_invited",
+        entity_type: "invite",
+        entity_id: token,
+        metadata: { invited_email: email, role, resend: true },
+      }); if (ie) console.error("Audit log insert (resend invite) error:", ie); } catch (e) { console.error("Audit log insert (resend invite) exception:", e); }
+
       return res.json({ success: true, token, resent: true });
     }
 
@@ -1611,6 +1690,20 @@ app.post("/api/team/invite", async (req, res) => {
 
     // 5. Send email
     await sendExpressInviteEmail(email, role, token, orgId);
+
+    // Audit log
+    const newInviteAuthHeader = req.headers.authorization;
+    const invitedByUserId = newInviteAuthHeader?.startsWith("Bearer ")
+      ? (await supabase.auth.getUser(newInviteAuthHeader.slice(7))).data?.user?.id
+      : null;
+    try { const { error: ie } = await supabase.from("audit_logs").insert({
+      org_id: orgId,
+      user_id: invitedByUserId,
+      action: "user_invited",
+      entity_type: "invite",
+      entity_id: token,
+      metadata: { invited_email: email, role },
+    }); if (ie) console.error("Audit log insert (new invite) error:", ie); } catch (e) { console.error("Audit log insert (new invite) exception:", e); }
 
     return res.json({ success: true, token });
   } catch (err: any) {
@@ -1805,14 +1898,29 @@ app.get("/api/team/my-role", async (req, res) => {
       return res.status(401).json({ error: "Invalid or expired token." });
     }
 
-    // Find org
-    const { data: org } = await supabase
+    // Find org that belongs to this user (owner or member)
+    const { data: userOrg } = await supabase
       .from("organizations")
-      .select("id, owner_id")
+      .select("id")
+      .eq("owner_id", user.id)
       .limit(1)
       .maybeSingle();
 
-    if (!org) {
+    let orgId: string | null = userOrg?.id || null;
+
+    if (!orgId) {
+      const { data: memberOrg } = await supabase
+        .from("org_members")
+        .select("org_id")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle();
+      orgId = memberOrg?.org_id || null;
+    }
+
+    if (!orgId) {
+      // Still no org — user hasn't set one up yet
       return res.json({ success: true, data: { role: "admin", org_id: null } });
     }
 
@@ -1820,21 +1928,27 @@ app.get("/api/team/my-role", async (req, res) => {
     const { data: member } = await supabase
       .from("org_members")
       .select("role")
-      .eq("org_id", org.id)
+      .eq("org_id", orgId)
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (member?.role) {
-      return res.json({ success: true, data: { role: member.role, org_id: org.id } });
+      return res.json({ success: true, data: { role: member.role, org_id: orgId } });
     }
 
     // Fallback: check if user is org owner
-    if (org.owner_id === user.id) {
-      return res.json({ success: true, data: { role: "admin", org_id: org.id } });
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("owner_id")
+      .eq("id", orgId)
+      .single();
+
+    if (org?.owner_id === user.id) {
+      return res.json({ success: true, data: { role: "admin", org_id: orgId } });
     }
 
     // Not found anywhere — still allow access with minimal role
-    return res.json({ success: true, data: { role: "operations_coordinator", org_id: org.id } });
+    return res.json({ success: true, data: { role: "operations_coordinator", org_id: orgId } });
   } catch (err: any) {
     console.error("Error fetching role:", err);
     res.status(500).json({ error: "Failed to fetch role." });
@@ -2266,12 +2380,27 @@ app.patch("/api/admin/users/:id", async (req, res) => {
     const { id } = req.params;
     const { action } = req.body;
 
+    let orgId: string | undefined;
     if (action === "suspend") {
+      const { data: member } = await supabase.from("org_members").select("org_id").eq("user_id", id).limit(1).maybeSingle();
+      orgId = member?.org_id;
       await supabase.from("org_members").update({ status: "suspended" }).eq("user_id", id);
     } else if (action === "unsuspend") {
       await supabase.from("org_members").update({ status: "active" }).eq("user_id", id);
     } else {
       return res.status(400).json({ error: "Invalid action" });
+    }
+
+    // Audit log
+    if (action === "suspend" && orgId) {
+      try { await supabase.from("audit_logs").insert({
+        org_id: orgId,
+        user_id: (req as any).adminUser?.id || "system",
+        action: "user_removed",
+        entity_type: "org_member",
+        entity_id: id,
+        metadata: { removed_user_id: id, by_admin: true },
+      }); } catch {}
     }
 
     res.json({ success: true });
@@ -2591,5 +2720,107 @@ app.post("/api/admin/notes", async (req, res) => {
     res.status(500).json({ error: "Failed to save note" });
   }
 });
+
+// ── GET /api/notifications — recent audit log entries ──
+// Note: follows the same unauth pattern as /api/team/members, /api/team/invite, etc.
+// If auth header provided, scopes to user's org. Otherwise returns first org's logs.
+app.get("/api/notifications", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    let targetOrgId: string | null = null;
+
+    // Try to scope to user's org if authenticated
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      const { data: { user } } = await supabase.auth.getUser(authHeader.slice(7));
+      if (user) {
+        const { data: membership } = await supabase
+          .from("org_members")
+          .select("org_id")
+          .eq("user_id", user.id)
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (membership) targetOrgId = membership.org_id;
+      }
+    }
+
+    // Fallback: first org (same pattern as /api/team/invite)
+    if (!targetOrgId) {
+      const { data: firstOrg } = await supabase
+        .from("organizations")
+        .select("id")
+        .limit(1)
+        .maybeSingle();
+      if (firstOrg) targetOrgId = firstOrg.id;
+    }
+
+    if (!targetOrgId) {
+      return res.json({ notifications: [] });
+    }
+
+    // Fetch recent audit logs for this org
+    const { data: logs, error: logsError } = await supabase
+      .from("audit_logs")
+      .select("*")
+      .eq("org_id", targetOrgId)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (logsError) {
+      return res.json({ notifications: [] });
+    }
+
+    const notifications = (logs || []).map((log: any) => ({
+      id: log.id,
+      action: log.action,
+      metadata: log.metadata,
+      text: describeNotification(log),
+      time: timeAgo(log.created_at),
+      created_at: log.created_at,
+    }));
+
+    res.json({ notifications });
+  } catch (err) {
+    console.error("GET /api/notifications error:", err);
+    res.json({ notifications: [] });
+  }
+});
+
+function describeNotification(log: any): string {
+  const m = log.metadata || {};
+  switch (log.action) {
+    case "invoice_uploaded":
+      return `Invoice ${m.invoice_number ? `#${m.invoice_number} ` : ""}uploaded`;
+    case "line_item_approved":
+      return `Line item approved${m.description ? `: ${m.description}` : ""}`;
+    case "line_item_disputed":
+      return `Line item flagged for dispute${m.description ? `: ${m.description}` : ""}`;
+    case "dispute_sent":
+      return `Dispute letter sent${m.carrier_name ? ` to ${m.carrier_name}` : ""}${m.amount ? ` for $${m.amount}` : ""}`;
+    case "dispute_resolved":
+      return `Dispute resolved${m.outcome ? `: ${m.outcome}` : ""}`;
+    case "contract_created":
+      return `Contract created${m.carrier_name ? ` with ${m.carrier_name}` : ""}`;
+    case "user_invited":
+      return "New user invited to organization";
+    case "user_removed":
+      return `${m.removed_email || "A user"} removed from organization`;
+    default:
+      return log.action || "Activity recorded";
+  }
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 export default app;

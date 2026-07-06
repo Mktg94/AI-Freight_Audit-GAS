@@ -111,19 +111,37 @@ export default function App() {
     
     if (supabaseUrl && supabaseKey && !supabaseUrl.includes('placeholder') && !supabaseKey.includes('placeholder')) {
       const supabase = createClient();
-      supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
-        if (existingSession) {
-          setSession(existingSession);
-          if (window.location.pathname.startsWith('/auth')) {
-            window.history.pushState({}, '', '/dashboard');
-            setCurrentPath('/dashboard');
-          }
+      // Validate session: getUser() actually verifies the token with Supabase
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) {
+          // Get the full session to set in state
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            if (window.location.pathname.startsWith('/auth')) {
+              window.history.pushState({}, '', '/dashboard');
+              setCurrentPath('/dashboard');
+            }
+          });
+        } else {
+          // Token invalid — clear stale session
+          localStorage.removeItem('fa_mock_session');
+          localStorage.removeItem('freight_audit_active_role');
+          setSession(null);
         }
       });
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
         setSession(newSession);
         if (event === 'PASSWORD_RECOVERY') return;
+        if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESH_FAILED') {
+          localStorage.removeItem('fa_mock_session');
+          localStorage.removeItem('freight_audit_active_role');
+          if (!window.location.pathname.startsWith('/auth')) {
+            window.history.pushState({}, '', '/auth/login');
+            setCurrentPath('/auth/login');
+          }
+          return;
+        }
         if (newSession && window.location.pathname.startsWith('/auth')) {
           window.history.pushState({}, '', '/dashboard');
           setCurrentPath('/dashboard');
