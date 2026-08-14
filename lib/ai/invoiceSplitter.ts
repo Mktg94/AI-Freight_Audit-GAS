@@ -25,7 +25,7 @@ export function splitMultiInvoicePDF(text: string, pageCount: number, pagesText?
       startPage: 1,
       endPage: pageCount || 1,
       text: text,
-      vendor: text.toLowerCase().includes("ups") ? "UPS Freight" : "FedEx Freight",
+      vendor: detectVendorHeuristic(text),
       estimatedTotal: extractPriceHeuristic(text)
     });
     return items;
@@ -49,7 +49,7 @@ export function splitMultiInvoicePDF(text: string, pageCount: number, pagesText?
         startPage: groupStart,
         endPage: i,
         text: currentGroupText.trim(),
-        vendor: currentGroupText.toLowerCase().includes("ups") ? "UPS Freight" : "FedEx Freight",
+        vendor: detectVendorHeuristic(currentGroupText),
         estimatedTotal: extractPriceHeuristic(currentGroupText)
       });
       currentGroupText = pageTxt;
@@ -66,7 +66,7 @@ export function splitMultiInvoicePDF(text: string, pageCount: number, pagesText?
       startPage: groupStart,
       endPage: srcPages.length,
       text: currentGroupText.trim(),
-      vendor: currentGroupText.toLowerCase().includes("ups") ? "UPS Freight" : "FedEx Freight",
+      vendor: detectVendorHeuristic(currentGroupText),
       estimatedTotal: extractPriceHeuristic(currentGroupText)
     });
   }
@@ -78,19 +78,30 @@ export function splitMultiInvoicePDF(text: string, pageCount: number, pagesText?
       startPage: 1,
       endPage: pageCount || 1,
       text: text,
-      vendor: "FedEx Freight",
-      estimatedTotal: 1100.00
+      vendor: detectVendorHeuristic(text),
+      estimatedTotal: extractPriceHeuristic(text)
     });
   }
 
   return items;
 }
 
-function extractPriceHeuristic(txt: string): number {
+function extractPriceHeuristic(txt: string): number | undefined {
   const matches = txt.match(/(?:total|amount|due|billed)(?::|\s+)\$?([0-9]+(?:\.[0-9]{2})?)/i);
   if (matches) {
     const val = parseFloat(matches[1]);
     if (val > 0) return val;
   }
-  return 450.00 + Math.floor(Math.random() * 800); 
+  return undefined; 
+}
+
+function detectVendorHeuristic(txt: string): string {
+  const lowerTxt = txt.toLowerCase();
+  if (lowerTxt.includes("ups") || lowerTxt.includes("united parcel service")) return "UPS Freight";
+  if (lowerTxt.includes("fedex") || lowerTxt.includes("federal express")) return "FedEx Freight";
+  if (lowerTxt.includes("xpo") || lowerTxt.includes("con-way")) return "XPO Logistics";
+  if (lowerTxt.includes("dhl")) return "DHL Freight";
+  if (lowerTxt.includes("old dominion") || lowerTxt.includes("odfl")) return "Old Dominion Freight Line";
+  if (lowerTxt.includes("yrc") || lowerTxt.includes("yellow")) return "Yellow Freight";
+  return "Unknown Carrier";
 }

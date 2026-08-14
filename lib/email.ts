@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 
-const SENDER_NAME = 'AI Freight Audit';
-const SENDER_EMAIL = 'mikeabrsh21@gmail.com';
+const SENDER_NAME = process.env.SENDER_NAME || 'AI Freight Audit';
+const SENDER_EMAIL = process.env.SENDER_EMAIL || 'support@freightaudit.ai';
 
 function getTransport() {
   const pass = process.env.GMAIL_APP_PASSWORD;

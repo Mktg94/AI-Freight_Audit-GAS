@@ -3,6 +3,7 @@ import express from "express";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
 import { extractInvoiceData } from "../lib/ai/extractInvoice";
+import { extractBOLData } from "../lib/ai/extractBOL";
 import { auditLineItems } from "../lib/ai/auditInvoice";
 import { generateDisputeLetter } from "../lib/ai/generateDispute";
 import { sendEmail } from "../lib/email";
@@ -121,7 +122,7 @@ app.post("/api/contracts", async (req, res) => {
         action: "contract_created", entity_type: "contract", entity_id: data.id,
         metadata: { carrier_name: payload.carrier_name, contract_number: data.contract_number },
       });
-    } catch {}
+    } catch { }
 
     res.json({ success: true, data });
   } catch (err: any) {
@@ -158,11 +159,15 @@ app.delete("/api/contracts/:id", async (req, res) => {
   }
 });
 
-app.post("/api/invoices/upload", uploadRouter.single("file"), async (req, res) => {
+app.post("/api/invoices/upload", uploadRouter.fields([{ name: "file", maxCount: 1 }, { name: "bol", maxCount: 1 }]), async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
-    const file = req.file;
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    const file = files?.["file"]?.[0] || (req as any).file;
+    const bolFile = files?.["bol"]?.[0];
+
     const contract_id = req.body.contract_id;
+    const user_id = req.body.user_id;
     let org_id = req.body.org_id;
 
     if (!file) {
@@ -171,13 +176,33 @@ app.post("/api/invoices/upload", uploadRouter.single("file"), async (req, res) =
     if (!contract_id) {
       return res.status(400).json({ success: false, step: "upload", error: "Missing contract id" });
     }
-    if (!org_id) {
-      const { data: org } = await supabase
-        .from("organizations")
-        .select("id")
-        .limit(1)
-        .single();
-      org_id = org?.id ?? await ensureDefaultOrg(supabase);
+
+    if (!org_id || org_id === user_id) {
+      if (user_id) {
+        const { data: userOrgs } = await supabase
+          .from("organizations")
+          .select("id")
+          .eq("owner_id", user_id)
+          .limit(1);
+        if (userOrgs && userOrgs.length > 0) {
+          org_id = userOrgs[0].id;
+        } else {
+          const { data: anyOrg } = await supabase
+            .from("organizations")
+            .select("id")
+            .limit(1)
+            .maybeSingle();
+          org_id = anyOrg?.id || null;
+        }
+      }
+      if (!org_id) {
+        const { data: org } = await supabase
+          .from("organizations")
+          .select("id")
+          .limit(1)
+          .single();
+        org_id = org?.id ?? await ensureDefaultOrg(supabase);
+      }
     }
     if (!org_id) {
       return res.status(400).json({ success: false, step: "upload", error: "No organization found. Sign up first." });
@@ -193,6 +218,15 @@ app.post("/api/invoices/upload", uploadRouter.single("file"), async (req, res) =
         step: "extraction",
         error: `Extraction failed: ${err.message}`,
       });
+    }
+
+    let extractedBOL: any = null;
+    if (bolFile) {
+      try {
+        extractedBOL = await extractBOLData(bolFile.buffer, bolFile.mimetype);
+      } catch (err: any) {
+        console.warn("Gemini BOL extraction failed, proceeding with contract rate audit:", err.message);
+      }
     }
 
     let invoice: any;
@@ -213,17 +247,17 @@ app.post("/api/invoices/upload", uploadRouter.single("file"), async (req, res) =
           source: 'single',
           file_name: file.originalname,
           file_url: urlData.publicUrl,
-          carrier_name: extractedInvoice.carrier_name,
-          invoice_number: extractedInvoice.invoice_number,
-          invoice_date: extractedInvoice.invoice_date,
-          shipment_date: extractedInvoice.shipment_date,
-          origin: extractedInvoice.origin,
-          destination: extractedInvoice.destination,
-          weight_lbs: extractedInvoice.weight_lbs,
-          distance_miles: extractedInvoice.distance_miles,
+          carrier_name: extractedInvoice.carrier_name || "Unknown Carrier",
+          invoice_number: extractedInvoice.invoice_number || `INV-${Date.now()}`,
+          invoice_date: extractedInvoice.invoice_date || new Date().toISOString().split("T")[0],
+          shipment_date: extractedInvoice.shipment_date || new Date().toISOString().split("T")[0],
+          origin: extractedInvoice.origin || "Origin N/A",
+          destination: extractedInvoice.destination || "Destination N/A",
+          weight_lbs: Number(extractedInvoice.weight_lbs) || Number(extractedBOL?.actual_weight_lbs) || 0,
+          distance_miles: Number(extractedInvoice.distance_miles) || 0,
           extracted_data: extractedInvoice,
           status: "auditing",
-          total_billed: extractedInvoice.total_billed,
+          total_billed: Number(extractedInvoice.total_billed) || 0,
           total_approved: 0,
           total_savings: 0,
           uploaded_at: new Date().toISOString(),
@@ -267,7 +301,9 @@ app.post("/api/invoices/upload", uploadRouter.single("file"), async (req, res) =
           quantity: Number(li.quantity) || 1,
           unit: li.unit || "unit",
         })),
-        contract
+        contract,
+        extractedInvoice,
+        extractedBOL
       );
     } catch (err: any) {
       console.error("Gemini audit failed:", err.message);
@@ -354,10 +390,13 @@ app.post("/api/invoices/detect-multi", (_req, res) => {
   res.json({ isMultiInvoice: false, estimatedCount: 1, previewData: [] });
 });
 
-app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, res) => {
+app.post("/api/invoices/batch-upload", uploadRouter.fields([{ name: "files" }, { name: "bol", maxCount: 1 }]), async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
-    const files = req.files as Express.Multer.File[];
+    const reqFiles = req.files as { [fieldname: string]: Express.Multer.File[] } | Express.Multer.File[] | undefined;
+    const files = Array.isArray(reqFiles) ? reqFiles : reqFiles?.["files"] || [];
+    const bolFile = Array.isArray(reqFiles) ? undefined : reqFiles?.["bol"]?.[0];
+
     const contract_id = req.body.contract_id;
     const user_id = req.body.user_id;
     let org_id = req.body.org_id;
@@ -426,6 +465,15 @@ app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, 
       console.warn("Failed to create batch record:", batchErr.message);
     }
 
+    let extractedBOL: any = null;
+    if (bolFile) {
+      try {
+        extractedBOL = await extractBOLData(bolFile.buffer, bolFile.mimetype);
+      } catch (bolErr: any) {
+        console.warn("Batch BOL extraction failed, proceeding with contract rate audit:", bolErr.message);
+      }
+    }
+
     for (const file of files) {
       try {
         let extractedInvoice: any;
@@ -461,8 +509,8 @@ app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, 
             shipment_date: extractedInvoice.shipment_date || new Date().toISOString().split("T")[0],
             origin: extractedInvoice.origin || "Origin N/A",
             destination: extractedInvoice.destination || "Destination N/A",
-            weight_lbs: extractedInvoice.weight_lbs || 0,
-            distance_miles: extractedInvoice.distance_miles || 0,
+            weight_lbs: Number(extractedInvoice.weight_lbs) || Number(extractedBOL?.actual_weight_lbs) || 0,
+            distance_miles: Number(extractedInvoice.distance_miles) || 0,
             extracted_data: extractedInvoice,
             status: "auditing",
             total_billed: extractedInvoice.total_billed || 0,
@@ -498,7 +546,7 @@ app.post("/api/invoices/batch-upload", uploadRouter.array("files"), async (req, 
 
           if (contractData && (extractedInvoice.line_items || extractedInvoice.extracted_data?.line_items) && lineItemCount > 0) {
             const lineItems = extractedInvoice.line_items || extractedInvoice.extracted_data?.line_items || [];
-            const auditResults = await auditLineItems(lineItems, contractData);
+            const auditResults = await auditLineItems(lineItems, contractData, extractedInvoice, extractedBOL);
 
             let totalApproved = 0;
             const lineItemInserts = auditResults.map((item, idx) => {
@@ -1214,7 +1262,7 @@ app.post("/api/disputes/:id/send", async (req, res) => {
         .eq("id", dispute.invoice_id)
         .single();
       if (inv?.invoice_number) invoiceNumber = inv.invoice_number;
-    } catch (_) {}
+    } catch (_) { }
 
     // Send email via Gmail SMTP if app password is configured
     if (process.env.GMAIL_APP_PASSWORD && dispute.carrier_email) {
@@ -1252,7 +1300,7 @@ app.post("/api/disputes/:id/send", async (req, res) => {
         action: "dispute_sent", entity_type: "dispute", entity_id: id,
         metadata: { carrier_name: dispute.carrier_name, amount: dispute.total_disputed_amount, invoice_number: invoiceNumber },
       });
-    } catch {}
+    } catch { }
 
     res.json({ success: true, data: updated });
   } catch (err: any) {
@@ -1317,7 +1365,7 @@ app.post("/api/disputes/:id/resolve", express.json(), async (req, res) => {
         action: "dispute_resolved", entity_type: "dispute", entity_id: id,
         metadata: { outcome: resolutionOutcome, amount: resolutionAmount, carrier_name: dispute.carrier_name },
       });
-    } catch {}
+    } catch { }
 
     res.json({ success: true, disputeId: id });
   } catch (err: any) {
@@ -1360,7 +1408,7 @@ app.post("/api/invoices/:id/approve", async (req, res) => {
         action: "line_item_approved", entity_type: "invoice", entity_id: id,
         metadata: { invoice_number: invoice.invoice_number, total_savings: savings },
       });
-    } catch {}
+    } catch { }
 
     res.json({ success: true, data: updated });
   } catch (err: any) {
@@ -1483,14 +1531,16 @@ app.delete("/api/team/:memberId", async (req, res) => {
       const delAuth = req.headers.authorization;
       const actingUser = delAuth?.startsWith("Bearer ")
         ? (await supabase.auth.getUser(delAuth.slice(7))).data?.user?.id : null;
-      try { await supabase.from("audit_logs").insert({
-        org_id: member.org_id,
-        user_id: actingUser,
-        action: "user_removed",
-        entity_type: "org_member",
-        entity_id: memberId,
-        metadata: { removed_user_id: member.user_id, removed_email: member.email },
-      }); } catch {}
+      try {
+        await supabase.from("audit_logs").insert({
+          org_id: member.org_id,
+          user_id: actingUser,
+          action: "user_removed",
+          entity_type: "org_member",
+          entity_id: memberId,
+          metadata: { removed_user_id: member.user_id, removed_email: member.email },
+        });
+      } catch { }
 
       return res.json({ success: true, deleted: true });
     }
@@ -1508,14 +1558,16 @@ app.delete("/api/team/:memberId", async (req, res) => {
     const suspendAuth = req.headers.authorization;
     const suspendUser = suspendAuth?.startsWith("Bearer ")
       ? (await supabase.auth.getUser(suspendAuth.slice(7))).data?.user?.id : null;
-    try { await supabase.from("audit_logs").insert({
-      org_id: member.org_id,
-      user_id: suspendUser,
-      action: "user_removed",
-      entity_type: "org_member",
-      entity_id: memberId,
-      metadata: { removed_user_id: member.user_id, removed_email: member.email },
-    }); } catch {}
+    try {
+      await supabase.from("audit_logs").insert({
+        org_id: member.org_id,
+        user_id: suspendUser,
+        action: "user_removed",
+        entity_type: "org_member",
+        entity_id: memberId,
+        metadata: { removed_user_id: member.user_id, removed_email: member.email },
+      });
+    } catch { }
 
     res.json({ success: true, data });
   } catch (err: any) {
@@ -1655,14 +1707,16 @@ app.post("/api/team/invite", async (req, res) => {
       const actingUserId = bearerToken?.startsWith("Bearer ")
         ? (await supabase.auth.getUser(bearerToken.slice(7))).data?.user?.id
         : null;
-      try { const { error: ie } = await supabase.from("audit_logs").insert({
-        org_id: orgId,
-        user_id: actingUserId,
-        action: "user_invited",
-        entity_type: "invite",
-        entity_id: token,
-        metadata: { invited_email: email, role, resend: true },
-      }); if (ie) console.error("Audit log insert (resend invite) error:", ie); } catch (e) { console.error("Audit log insert (resend invite) exception:", e); }
+      try {
+        const { error: ie } = await supabase.from("audit_logs").insert({
+          org_id: orgId,
+          user_id: actingUserId,
+          action: "user_invited",
+          entity_type: "invite",
+          entity_id: token,
+          metadata: { invited_email: email, role, resend: true },
+        }); if (ie) console.error("Audit log insert (resend invite) error:", ie);
+      } catch (e) { console.error("Audit log insert (resend invite) exception:", e); }
 
       return res.json({ success: true, token, resent: true });
     }
@@ -1696,14 +1750,16 @@ app.post("/api/team/invite", async (req, res) => {
     const invitedByUserId = newInviteAuthHeader?.startsWith("Bearer ")
       ? (await supabase.auth.getUser(newInviteAuthHeader.slice(7))).data?.user?.id
       : null;
-    try { const { error: ie } = await supabase.from("audit_logs").insert({
-      org_id: orgId,
-      user_id: invitedByUserId,
-      action: "user_invited",
-      entity_type: "invite",
-      entity_id: token,
-      metadata: { invited_email: email, role },
-    }); if (ie) console.error("Audit log insert (new invite) error:", ie); } catch (e) { console.error("Audit log insert (new invite) exception:", e); }
+    try {
+      const { error: ie } = await supabase.from("audit_logs").insert({
+        org_id: orgId,
+        user_id: invitedByUserId,
+        action: "user_invited",
+        entity_type: "invite",
+        entity_id: token,
+        metadata: { invited_email: email, role },
+      }); if (ie) console.error("Audit log insert (new invite) error:", ie);
+    } catch (e) { console.error("Audit log insert (new invite) exception:", e); }
 
     return res.json({ success: true, token });
   } catch (err: any) {
@@ -1828,7 +1884,7 @@ app.post("/api/team/accept-invite", async (req, res) => {
       if (createError.code === 'email_exists') {
         // User already has an auth account — fetch their existing ID
         const { data: existingUsers } = await supabase.auth.admin.listUsers();
-        const existing = existingUsers?.users?.find(u => u.email === invite.email);
+        const existing = (existingUsers?.users as any[])?.find((u: any) => u.email === invite.email);
         if (existing) {
           authUserId = existing.id;
         } else {
@@ -2393,14 +2449,16 @@ app.patch("/api/admin/users/:id", async (req, res) => {
 
     // Audit log
     if (action === "suspend" && orgId) {
-      try { await supabase.from("audit_logs").insert({
-        org_id: orgId,
-        user_id: (req as any).adminUser?.id || "system",
-        action: "user_removed",
-        entity_type: "org_member",
-        entity_id: id,
-        metadata: { removed_user_id: id, by_admin: true },
-      }); } catch {}
+      try {
+        await supabase.from("audit_logs").insert({
+          org_id: orgId,
+          user_id: (req as any).adminUser?.id || "system",
+          action: "user_removed",
+          entity_type: "org_member",
+          entity_id: id,
+          metadata: { removed_user_id: id, by_admin: true },
+        });
+      } catch { }
     }
 
     res.json({ success: true });

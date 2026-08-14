@@ -1,4 +1,4 @@
-import { generateGeminiContent, parseGeminiJSON, callGeminiWithRetry } from './geminiClient'
+import { generateGeminiContent, parseGeminiJSON, callGeminiWithRetry, getGeminiModel } from './geminiClient'
 
 export interface ExtractedLineItem {
   description: string
@@ -59,11 +59,10 @@ surcharges, and any other fees listed).
 
 Be precise with decimal numbers. Return ONLY the JSON object, nothing else.`
 
-  const genAI = new (await import('@google/genai')).GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
+  const model = getGeminiModel(true)
 
   const result = await callGeminiWithRetry(
-    () => genAI.models.generateContent({
-      model: process.env.GEMINI_MODEL_NAME || 'gemini-2.5-flash',
+    () => model.generateContent({
       contents: [
         {
           inlineData: {
@@ -72,8 +71,7 @@ Be precise with decimal numbers. Return ONLY the JSON object, nothing else.`
           }
         },
         { text: prompt }
-      ],
-      config: { responseMimeType: 'application/json' }
+      ]
     }),
     'extractInvoiceData'
   )

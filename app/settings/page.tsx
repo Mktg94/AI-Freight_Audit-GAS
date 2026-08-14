@@ -1,12 +1,12 @@
-//@ts-nocheck
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Building2, Sliders, ShieldCheck, Mail, Sparkles, Key, KeyRound, 
-  Terminal, User, CheckCircle2, AlertTriangle, Play, CheckCircle, 
-  Lock, Eye, EyeOff, Laptop, HelpCircle, Palette, Sun, Moon,
-  Users, Loader2, XCircle
+import {
+  Building2, Sliders, ShieldCheck, Mail, Sparkles,
+  AlertTriangle, CheckCircle,
+  Lock, Eye, EyeOff, Palette,
+  Users, Loader2,
+  KeyRound, Laptop, XCircle
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRole } from '@/lib/auth/RoleContext';
@@ -16,7 +16,7 @@ import InviteMemberForm from '@/components/settings/InviteMemberForm';
 
 export default function SettingsPage() {
   const { role: simulatedRole, setRole: setSimulatedRole } = useRole();
-  const [activeTab, setActiveTab] = useState<'organization' | 'integrations' | 'appearance' | 'account' | 'roles' | 'team' | 'billing'>('organization');
+  const [activeTab, setActiveTab] = useState<'organization' | 'appearance' | 'account' | 'roles' | 'team' | 'billing' | 'integrations'>('organization');
   const [loadingOrg, setLoadingOrg] = useState(false);
   const [loadingIntegrations, setLoadingIntegrations] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
@@ -290,7 +290,8 @@ export default function SettingsPage() {
           )}
         </button>
 
-        <button
+        {/* Integrations tab hidden for MVP — uncomment when ready */}
+        {/* <button
           onClick={() => setActiveTab('integrations')}
           className={`pb-3 px-5 relative transition-all cursor-pointer ${
             activeTab === 'integrations' ? 'text-indigo-600 font-bold' : 'hover:text-gray-600 text-gray-400'
@@ -300,7 +301,7 @@ export default function SettingsPage() {
           {activeTab === 'integrations' && (
             <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-indigo-600" />
           )}
-        </button>
+        </button> */}
 
         <button
           onClick={() => setActiveTab('appearance')}
@@ -939,7 +940,7 @@ export default function SettingsPage() {
                                   <span className={`inline-flex items-center gap-1 text-[10px] font-semibold font-mono px-2 py-0.5 rounded-full ${
                                     isCurrentSimmed ? 'bg-green-50 text-green-700' : 'text-green-600'
                                   }`}>
-                                    <CheckCircle2 size={10} /> ALLOWED
+                                    <CheckCircle size={10} /> ALLOWED
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold font-mono px-2 py-0.5 rounded-full text-red-400 bg-red-50">
@@ -1166,7 +1167,7 @@ export default function SettingsPage() {
 
                     {orgPlan.toLowerCase() === 'enterprise' && (
                       <div className="flex items-center gap-3 py-2 w-full justify-center text-center">
-                        <CheckCircle2 className="text-green-500" size={22} />
+                        <CheckCircle className="text-green-500" size={22} />
                         <div>
                           <strong className="text-gray-900 text-sm">You are on our best high-payload plan</strong>
                           <p className="text-xs text-gray-400 mt-0.5">Thank you for leveraging FreightAudit AI Enterprise workspace!</p>

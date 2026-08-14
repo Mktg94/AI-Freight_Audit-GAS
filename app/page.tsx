@@ -91,13 +91,6 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
             {/* HERO text content */}
             <div className="lg:col-span-7">
-              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" />
-                <span className={`font-mono text-[12px] font-semibold tracking-wide text-indigo-700 uppercase`}>
-                  Structured Clarity
-                </span>
-              </div>
-
               <h1 className="mt-5 text-4xl md:text-5xl font-bold tracking-tight text-gray-900 leading-[1.08]">
                 Freight invoices, automatically
                 <span className="block text-indigo-600">audited for correctness.</span>
@@ -118,14 +111,6 @@ export default function LandingPage() {
                   <ArrowRight className="w-4 h-4" />
                 </a>
 
-            <a
-              href="/auth/signup"
-              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-150 inline-flex items-center gap-1.5"
-              onClick={navigate('/auth/signup')}
-            >
-              Get started free
-              <ArrowRight className="w-3.5 h-3.5" />
-            </a>
               </div>
 
               <div className="mt-7 grid grid-cols-1 sm:grid-cols-3 gap-4">

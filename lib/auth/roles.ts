@@ -91,10 +91,10 @@ export async function getUserRole(supabase: SupabaseClient, orgId: string): Prom
       return 'admin';
     }
 
-    // Fall back to 'admin' in sandbox environment if user is authenticated
-    return 'admin';
+    // Default to the lowest privilege role if they somehow have access without an explicit role, or null if strict
+    return 'operations_coordinator';
   } catch (err) {
     console.warn("getUserRole fallback active:", err);
-    return 'admin';
+    return 'operations_coordinator';
   }
 }

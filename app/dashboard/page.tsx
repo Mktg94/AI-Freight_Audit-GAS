@@ -61,8 +61,9 @@ export default function DashboardPage() {
     window.dispatchEvent(new Event('popstate'));
   };
 
-  const currentYear = 2026;
-  const currentMonthNum = 5; // 0-indexed May
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentMonthNum = currentDate.getMonth();
 
   const invoicesThisMonth = invoices.filter(inv => {
     const uploadDate = new Date(inv.uploaded_at);

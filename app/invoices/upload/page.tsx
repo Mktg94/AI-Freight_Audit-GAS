@@ -7,8 +7,8 @@ import BatchProgressTracker from '@/components/invoices/BatchProgressTracker';
 import UsageLimitBanner from '@/components/shared/UsageLimitBanner';
 import { createClient } from '@/lib/supabase/client';
 import { Contract } from '@/types';
-import { 
-  FileText, Landmark, Play, Loader2, ArrowLeft, Sparkles 
+import {
+  FileText, Landmark, Play, Loader2, ArrowLeft, Sparkles
 } from 'lucide-react';
 
 export default function InvoiceUploadPage() {
@@ -18,6 +18,8 @@ export default function InvoiceUploadPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [loadingContracts, setLoadingContracts] = useState(true);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [duplicateInfo, setDuplicateInfo] = useState<{ message: string; existingId: string } | null>(null);
+  const [selectedBOLFile, setSelectedBOLFile] = useState<File | null>(null);
 
   const [showSplitModal, setShowSplitModal] = useState(false);
   const [splitFileName, setSplitFileName] = useState('');
@@ -62,6 +64,7 @@ export default function InvoiceUploadPage() {
 
     setCheckingMulti(true);
     setUploadError(null);
+    setDuplicateInfo(null);
 
     try {
       for (const file of selectedFiles) {
@@ -75,7 +78,7 @@ export default function InvoiceUploadPage() {
 
         if (checkRes.ok) {
           const checkData = await checkRes.json();
-          
+
           if (checkData.isMultiInvoice) {
             setSplitFileName(file.name);
             setSplitDetectedCount(checkData.estimatedCount);
@@ -100,27 +103,61 @@ export default function InvoiceUploadPage() {
     setShowSplitModal(false);
     setCheckingMulti(true);
     setUploadError(null);
+    setDuplicateInfo(null);
 
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || '';
 
-      const formData = new FormData();
+      if (selectedFiles.length === 1 && selectedBOLFile) {
+        const singleFormData = new FormData();
+        singleFormData.append('file', selectedFiles[0]);
+        singleFormData.append('bol', selectedBOLFile);
+        singleFormData.append('contract_id', selectedContractId);
+        if (userId) singleFormData.append('user_id', userId);
+
+        const res = await fetch('/api/invoices/upload', {
+          method: 'POST',
+          body: singleFormData
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          if (res.status === 409 && data.duplicate) {
+            setDuplicateInfo({ message: data.error, existingId: data.existingInvoiceId || '' });
+            return;
+          }
+          throw new Error(data.error || '3-Way Audit upload failed.');
+        }
+
+        const invoiceId = data.invoiceId || data.data?.invoice?.id;
+        if (invoiceId) {
+          window.history.pushState({}, '', `/invoices/${invoiceId}`);
+          window.dispatchEvent(new Event('popstate'));
+        }
+        return;
+      }
+
+      const batchFormData = new FormData();
       selectedFiles.forEach((file) => {
-        formData.append('files', file);
+        batchFormData.append('files', file);
       });
-      formData.append('contract_id', selectedContractId);
-      if (userId) formData.append('user_id', userId);
+      batchFormData.append('contract_id', selectedContractId);
+      if (userId) batchFormData.append('user_id', userId);
 
       const res = await fetch('/api/invoices/batch-upload', {
         method: 'POST',
-        body: formData
+        body: batchFormData
       });
 
       const data = await res.json();
 
       if (!res.ok) {
+        // Duplicate invoice — show amber warning, not a red error
+        if (res.status === 409 && data.duplicate) {
+          setDuplicateInfo({ message: data.error, existingId: data.existingInvoiceId || '' });
+          return;
+        }
         if (data.error === 'invoice_limit_reached') {
           throw new Error(`Usage limit of ${data.limit} monthly invoices reached. Upgrade plan to resume audits.`);
         }
@@ -146,7 +183,7 @@ export default function InvoiceUploadPage() {
 
   return (
     <div className="max-w-2xl mx-auto py-8 space-y-6" id="upload-pipeline-wrapper">
-      
+
       <div className="flex items-center gap-3">
         <button
           onClick={() => {
@@ -173,6 +210,30 @@ export default function InvoiceUploadPage() {
 
       {phase === 1 ? (
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 space-y-5" id="phase-1-form">
+          {/* Duplicate invoice warning — shown instead of a red error */}
+          {duplicateInfo && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3" id="duplicate-invoice-warning">
+              <div className="text-amber-500 text-xl shrink-0">⚠️</div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-amber-800">Duplicate Invoice Detected</p>
+                <p className="text-sm text-amber-700 mt-0.5">{duplicateInfo.message}</p>
+                {duplicateInfo.existingId && (
+                  <button
+                    onClick={() => {
+                      window.history.pushState({}, '', `/invoices/${duplicateInfo.existingId}`);
+                      window.dispatchEvent(new Event('popstate'));
+                    }}
+                    className="mt-2 text-xs font-semibold text-amber-700 underline underline-offset-2 hover:text-amber-900 cursor-pointer"
+                  >
+                    View existing invoice →
+                  </button>
+                )}
+              </div>
+              <button onClick={() => setDuplicateInfo(null)} className="text-amber-400 hover:text-amber-700 text-lg leading-none cursor-pointer">✕</button>
+            </div>
+          )}
+
+          {/* General upload errors */}
           {uploadError && (
             <div className="bg-red-50 border border-red-100 text-red-600 p-3 rounded-xl text-sm" id="upload-error-display">
               {uploadError}
@@ -184,6 +245,52 @@ export default function InvoiceUploadPage() {
               Invoice PDF Documents
             </label>
             <UploadDropzone onFilesSelect={setSelectedFiles} />
+          </div>
+
+          {/* Optional Bill of Lading (BOL) Section for 3-Way Audit */}
+          <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+                <Sparkles size={14} className="text-indigo-600" />
+                Bill of Lading (BOL) Shipping Manifest
+              </label>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 uppercase font-mono">
+                Optional • 3-Way Audit
+              </span>
+            </div>
+            <p className="text-xs text-gray-500">
+              Attach shipping BOL to cross-check actual shipped weight vs billed weight and verify accessorial charges (liftgate, residential fees).
+            </p>
+            {selectedBOLFile ? (
+              <div className="flex items-center justify-between bg-white border border-indigo-200 rounded-lg p-2.5 shadow-sm">
+                <div className="flex items-center gap-2 text-xs font-medium text-gray-800 truncate">
+                  <FileText size={16} className="text-indigo-600 shrink-0" />
+                  <span className="truncate">{selectedBOLFile.name}</span>
+                  <span className="text-gray-400 font-mono text-[10px]">({(selectedBOLFile.size / 1024).toFixed(0)} KB)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBOLFile(null)}
+                  className="text-gray-400 hover:text-red-500 text-xs font-semibold cursor-pointer ml-2"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <label className="flex items-center justify-center gap-2 py-2 px-3 bg-white border border-dashed border-indigo-200 hover:border-indigo-400 rounded-lg cursor-pointer transition-colors text-center">
+                <span className="text-xs font-medium text-indigo-600">Select Bill of Lading PDF...</span>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setSelectedBOLFile(e.target.files[0]);
+                    }
+                  }}
+                />
+              </label>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -218,11 +325,10 @@ export default function InvoiceUploadPage() {
             type="button"
             disabled={selectedFiles.length === 0 || !selectedContractId || checkingMulti}
             onClick={handleStartAuditCheck}
-            className={`w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-150 ${
-              selectedFiles.length > 0 && selectedContractId && !checkingMulti
+            className={`w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-150 ${selectedFiles.length > 0 && selectedContractId && !checkingMulti
                 ? 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white cursor-pointer'
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            }`}
+              }`}
           >
             {checkingMulti ? (
               <>
@@ -239,10 +345,10 @@ export default function InvoiceUploadPage() {
         </div>
       ) : (
         currentBatchId && (
-          <BatchProgressTracker 
-            batchId={currentBatchId} 
-            files={selectedFiles} 
-            onRetry={handleReturnToSetup} 
+          <BatchProgressTracker
+            batchId={currentBatchId}
+            files={selectedFiles}
+            onRetry={handleReturnToSetup}
             onComplete={(ids) => {
               window.dispatchEvent(new CustomEvent('invoices-updated'));
               window.dispatchEvent(new CustomEvent('toast-message', {
