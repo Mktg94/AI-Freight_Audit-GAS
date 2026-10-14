@@ -55,7 +55,7 @@ export default function ContractCard({ contract, onEdit, onDelete }: ContractCar
   const remaining = (contract.charge_items || []).length - 6;
 
   return (
-    <div 
+    <div
       className="bg-white rounded-2xl border border-gray-100 p-5 relative overflow-hidden transition-all duration-200 hover:border-gray-200 hover:shadow-sm flex flex-col justify-between h-full"
       id={`contract-card-${contract.id}`}
     >
